@@ -3,7 +3,7 @@ import { newGame } from '../../src/game.js';
 import { finishOnboarding } from './helpers.js';
 
 test.setTimeout(process.env.CI ? 120000 : 60000);
-const diag=page=>page.evaluate(()=>window.__sunny.diagnostics());
+const diag=(page,pixels=false)=>page.evaluate(pixels=>window.__sunny.diagnostics({pixels}),pixels);
 const game=page=>page.evaluate(()=>window.__sunny.state().game);
 async function boot(page,seed) {
   if(seed) await page.addInitScript(seed=>{
@@ -126,12 +126,12 @@ test('low-poly coast and reflective water render without GPU errors on desktop a
   page.on('pageerror',e=>errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   await boot(page,newGame());
-  const d=await diag(page);
+  const d=await diag(page,true);
   await expect.poll(()=>diag(page).then(d=>d.environment.ocean.reflectedFrames)).toBeGreaterThan(3);
   expect(d.environment.grass.style).toBe('low-poly');
   expect(d.environment.grass.blades).toBeLessThan(1000);
   await page.waitForTimeout(1000);
-  expect((await diag(page)).environment.waterSamples).not.toEqual(d.environment.waterSamples);
+  expect((await diag(page,true)).environment.waterSamples).not.toEqual(d.environment.waterSamples);
   await page.screenshot({path:'test-results/coast-desktop.png'});
   await page.getByLabel('镜头设置',{exact:true}).click();
   await page.getByRole('button',{name:'透视镜头',exact:true}).click();
@@ -141,7 +141,7 @@ test('low-poly coast and reflective water render without GPU errors on desktop a
   await page.setViewportSize({width:390,height:844});
   await page.waitForTimeout(500);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(390);
-  expect(new Set((await diag(page)).samples.map(p=>p.join(','))).size).toBeGreaterThan(3);
+  expect(new Set((await diag(page,true)).samples.map(p=>p.join(','))).size).toBeGreaterThan(3);
   await page.screenshot({path:'test-results/coast-mobile.png'});
   expect(errors).toEqual([]);
 });

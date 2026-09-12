@@ -399,7 +399,7 @@ export default function App({ modelWarning = false }) {
     if (!import.meta.env.DEV) return;
     window.__sunny = {
       state: () => latest.current,
-      diagnostics: () => world.current?.diagnostics(),
+      diagnostics: options => world.current?.diagnostics(options),
       project: (x, y, z) => world.current?.project(x, y, z),
     };
     return () => { delete window.__sunny; };

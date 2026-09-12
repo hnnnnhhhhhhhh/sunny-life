@@ -597,10 +597,10 @@ export class World {
     return { x: (p.x + 1) * this.width / 2, y: (-p.y + 1) * this.height / 2 };
   }
 
-  diagnostics() {
+  diagnostics({ pixels = true } = {}) {
     const gl = this.renderer.getContext(), width = gl.drawingBufferWidth, height = gl.drawingBufferHeight;
     const samples = [];
-    for (let i = 1; i < 7; i++) {
+    for (let i = 1; pixels && i < 7; i++) {
       const pixel = new Uint8Array(4);
       gl.readPixels(Math.floor(width * i / 8), Math.floor(height * (i % 3 + 2) / 6), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
       samples.push(Array.from(pixel));
@@ -612,7 +612,7 @@ export class World {
       });
       return { id, source: mesh.userData.source || 'procedural', type: mesh.userData.type, dyes };
     });
-    const waterSamples = [[-6, 13.3], [7, 14], [18, -2]].map(([x, z]) => {
+    const waterSamples = (pixels ? [[-6, 13.3], [7, 14], [18, -2]] : []).map(([x, z]) => {
       const screen = this.project(x, layout.waterHeight, z);
       const pixel = new Uint8Array(4);
       const px = Math.round(screen.x / this.width * width), py = Math.round((1 - screen.y / this.height) * height);
@@ -639,7 +639,7 @@ export class World {
       neighbors: this.npcs.map(npc => ({ id: npc.id, name: npc.data.name, position: npc.mesh.position.toArray(), rotation: npc.mesh.rotation.y, busy: npc.busy, clip: npc.mesh.userData.controller?.name })),
       televisions: [...this.items].filter(([, item]) => item.mesh.userData.screenPlayback).map(([id, item]) => {
         const screen = item.mesh.getObjectByName('TVScreen');
-        const pixels = [-0.35, 0, 0.35].map(x => {
+        const screenPixels = (pixels ? [-0.35, 0, 0.35] : []).map(x => {
           const point = screen.localToWorld(new THREE.Vector3(x, 0.23, 0));
           const p = this.project(point.x, point.y, point.z);
           const color = new Uint8Array(4);
@@ -647,7 +647,7 @@ export class World {
           if (px >= 0 && py >= 0 && px < width && py < height) gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, color);
           return [...color];
         });
-        return { id, ...item.mesh.userData.screenPlayback.diagnostics(), screenPixels: pixels };
+        return { id, ...item.mesh.userData.screenPlayback.diagnostics(), screenPixels };
       }),
       windows: this.house.userData.wallGroups.flatMap(({ full }) => full.children.filter(node => node.name === 'HouseWindow')).map(node => ({
         ...node.userData.window, glass: new THREE.Box3().setFromObject(node.getObjectByName('WindowGlass')).getCenter(new THREE.Vector3()).toArray(),
