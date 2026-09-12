@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { newGame } from '../../src/game.js';
 
-const diag = page => page.evaluate(() => window.__sunny.diagnostics());
+const diag = page => page.evaluate(() => window.__sunny.diagnostics({ pixels:false }));
 async function boot(page, game) {
   await page.addInitScript(game => localStorage.setItem('sunny-life.save.v1', JSON.stringify(game)), game);
   await page.goto('/');
@@ -50,9 +50,11 @@ test('shower cancellation and furniture deletion clear water, screen and pose', 
   game.sim.autonomy = false; game.sim.needs.hygiene = 15;
   await boot(page, game);
   await useShower(page);
+  await page.getByRole('button', { name: '暂停生活', exact: true }).click();
   const previous = await page.evaluate(() => window.__sunny.state().game.sim.needs.hygiene);
   expect((await diag(page)).walls.find(w => w.id === 'exterior-west').full).toBe(false);
   await page.getByRole('button', { name: '取消当前活动', exact: true }).click();
+  await page.getByRole('button', { name: '继续生活', exact: true }).click();
   await expect.poll(() => diag(page).then(d => d.activity)).toBeNull();
   expect((await diag(page)).bathroom).toBeNull();
   expect(await page.evaluate(() => window.__sunny.state().game.sim.needs.hygiene)).toBeLessThan(previous + 1);

@@ -72,18 +72,27 @@ def line(name, coordinates, radius, role, bind, variant=None, accessory=None):
 def arm_weights(side):
     def weights(p):
         y = p.z
-        if y > 1.58:
-            amount = min(1, max(0, (abs(p.x) - 0.15) / 0.18)) * min(1, max(0.25, (1.75 - y) / 0.17))
+        if y > 1.48:
+            amount = min(1, max(0, (abs(p.x) - 0.16) / 0.11)) * min(1, max(0.2, (1.70 - y) / 0.18))
             return {"Chest": 1 - amount, f"UpperArm_{side}": amount}
-        if y >= 1.42:
+        if y >= 1.40:
             return {f"UpperArm_{side}": 1}
-        if y >= 1.28:
-            amount = (y - 1.28) / 0.14
+        if y >= 1.26:
+            amount = (y - 1.26) / 0.14
             return {f"UpperArm_{side}": amount, f"Forearm_{side}": 1 - amount}
-        if y >= 1.075:
+        if y >= 1.055:
             return {f"Forearm_{side}": 1}
         return {f"Hand_{side}": 1}
     return weights
+
+
+def garment_weights(p):
+    if abs(p.x) < 0.18 or p.z < 1.24 and abs(p.x) < 0.21:
+        return torso_weights(p)
+    side = "L" if p.x < 0 else "R"
+    if p.z < 1.48 and abs(p.x) < 0.22:
+        return torso_weights(p)
+    return arm_weights(side)(p)
 
 
 def leg_weights(side):
@@ -125,15 +134,15 @@ def bone_rig():
     ]
     for side, s in [("L", -1), ("R", 1)]:
         definitions.extend([
-            (f"UpperArm_{side}", (s * 0.255, 1.665, 0), (s * 0.325, 1.34, 0), "Chest"),
-            (f"Forearm_{side}", (s * 0.325, 1.34, 0), (s * 0.34, 1.045, 0), f"UpperArm_{side}"),
-            (f"Hand_{side}", (s * 0.34, 1.045, 0), (s * 0.345, 0.915, 0.008), f"Forearm_{side}"),
+            (f"UpperArm_{side}", (s * 0.218, 1.635, 0), (s * 0.263, 1.32, 0), "Chest"),
+            (f"Forearm_{side}", (s * 0.263, 1.32, 0), (s * 0.278, 1.03, 0), f"UpperArm_{side}"),
+            (f"Hand_{side}", (s * 0.278, 1.03, 0), (s * 0.282, 0.9, 0.008), f"Forearm_{side}"),
             (f"Thigh_{side}", (s * 0.115, 1.08, 0), (s * 0.115, 0.58, 0.005), "Hips"),
             (f"Shin_{side}", (s * 0.115, 0.58, 0.005), (s * 0.115, 0.09, 0), f"Thigh_{side}"),
             (f"Foot_{side}", (s * 0.115, 0.09, 0), (s * 0.115, 0.09, 0.19), f"Shin_{side}"),
             (f"Eye_{side}", (s * 0.058, 1.975, 0.13), (s * 0.058, 2.005, 0.13), "Head"),
         ])
-    definitions.append(("UtensilTip", (0.345, 0.835, 0.025), (0.345, 0.855, 0.025), "Hand_R"))
+    definitions.append(("UtensilTip", (0.282, 0.820, 0.025), (0.282, 0.840, 0.025), "Hand_R"))
     for name, head, tail, parent in definitions:
         bone = armature.edit_bones.new(name)
         bone.head, bone.tail = b.point(*head), b.point(*tail)
@@ -155,14 +164,14 @@ def body():
         rounded(f"Rubber sole {side}", (s*.115,.024,.065), (.196,.048,.347), "Sole", f"Foot_{side}", .014)
         for z in [.035,.078,.118]:
             line("Shoe lace", [(s*.115-.057,.165,z),(s*.115+.057,.165,z+.011)], .004, "Undershirt", f"Foot_{side}")
-        loft(f"Skin arm {side}", [(s*.255,1.65,0,.068,.071),(s*.31,1.48,0,.058,.061),
-             (s*.325,1.35,0,.046,.05),(s*.337,1.18,0,.041,.043),(s*.34,1.04,0,.031,.034)],
+        loft(f"Skin arm {side}", [(s*.248,1.46,0,.044,.049),
+             (s*.263,1.33,0,.04,.045),(s*.275,1.17,0,.036,.04),(s*.278,1.025,0,.029,.032)],
              "Skin", arm_weights(side), 8)
-        rounded(f"Hand palm {side}", (s*.343,.979,.005), (.07,.12,.045), "Skin", f"Hand_{side}", .015)
-        thumb = rounded(f"Thumb {side}", (s*.301,1.0,.022), (.027,.061,.032), "Skin", f"Hand_{side}", .009)
+        rounded(f"Hand palm {side}", (s*.282,.964,.005), (.066,.12,.044), "Skin", f"Hand_{side}", .015)
+        thumb = rounded(f"Thumb {side}", (s*.244,.985,.022), (.026,.061,.032), "Skin", f"Hand_{side}", .009)
         thumb.rotation_euler.y = s * .3
         for finger in range(3):
-            rounded(f"Finger crease {side}", (s*.32+finger*.019,.93,.029), (.011,.035,.004), "SkinShade", f"Hand_{side}", .003)
+            rounded(f"Finger crease {side}", (s*(.264+finger*.018),.915,.029), (.011,.035,.004), "SkinShade", f"Hand_{side}", .003)
 
 
 def face():
@@ -185,32 +194,80 @@ def face():
     line("Mouth crease", [(-.026,1.916,.124),(0,1.912,.134),(.026,1.916,.124)], .0028, "Lips", "Jaw")
 
 
+def garment_shell(outfit):
+    vertices, faces, lookup = [], [], {}
+    hem = 1.17 if outfit == "shirt" else 1.11
+    length = 1.335 if outfit == "shirt" else 1.1
+
+    def vertex(p):
+        key = tuple(round(value, 6) for value in p)
+        if key not in lookup:
+            lookup[key] = len(vertices)
+            vertices.append(key)
+        return lookup[key]
+
+    def face(points):
+        faces.append(tuple(vertex(p) for p in points))
+
+    def panel(inner, outer):
+        rows = []
+        for a, bpoint in zip(inner, outer):
+            rows.append([tuple(a[j]*(1-t)+bpoint[j]*t for j in range(3)) for t in [0, .5, 1]])
+        for i in range(len(rows)-1):
+            for j in range(2):
+                face([rows[i][j], rows[i][j+1], rows[i+1][j+1], rows[i+1][j]])
+        return rows
+
+    for side, s in [("L",-1),("R",1)]:
+        hole = [(s*.222,1.638,0),(s*.211,1.610,.073),(s*.196,1.545,.1),
+                (s*.187,1.49,.073),(s*.184,1.467,0),(s*.187,1.49,-.068),
+                (s*.196,1.545,-.091),(s*.211,1.610,-.068)]
+        front = [(s*.184,hem,.09),(s*.177,1.28,.103),hole[3],hole[2],hole[1]]
+        back = [(s*.184,hem,-.105),(s*.177,1.28,-.115),hole[5],hole[6],hole[7]]
+        inner = [(s*.04,hem,.129),(s*.041,1.28,.134),(s*.043,1.46,.137),
+                 (s*.053,1.565,.126),(s*.075,1.685,.078)]
+        center_back = [(0,hem,-.123),(0,1.28,-.131),(0,1.48,-.135),
+                       (0,1.59,-.113),(0,1.685,-.073)]
+        front_rows = panel(inner,front)
+        back_rows = panel(center_back,back)
+        face([front[0],back[0],back[1],front[1]])
+        face([front[1],back[1],hole[5],hole[4],hole[3]])
+        collar_back = (s*.075,1.685,-.073)
+        face([inner[-1],front_rows[-1][1],hole[1],hole[0]])
+        face([inner[-1],hole[0],collar_back])
+        face([hole[0],hole[7],collar_back])
+        face([collar_back,hole[7],back_rows[-1][1],center_back[-1]])
+
+        # The armhole belongs to both the torso and sleeve, with shared vertices
+        # and weights. There is no detached sleeve cap or shoulder-cover patch.
+        previous = hole
+        for cx, y, rx, rz, slope in [(.242,1.49,.058,.063,.045),(.263,1.36,.052,.054,.008),
+                                      (.277,length,.047,.050,0)]:
+            ring = [(s*(cx+math.cos(i*math.tau/8)*rx),y+math.cos(i*math.tau/8)*slope,
+                     math.sin(i*math.tau/8)*rz) for i in range(8)]
+            for i in range(8):
+                j = (i+1)%8
+                face([previous[i],previous[j],ring[j],ring[i]])
+            previous = ring
+        if outfit != "shirt":
+            loft("Folded sleeve cuff", [(s*.277,length-.006,0,.05,.053),(s*.277,length+.043,0,.052,.055)],
+                 "TopShade", f"Forearm_{side}", 8, outfit)
+        if outfit != "cardigan":
+            poly("Relaxed folded collar", [(s*.05,1.710,.063),(s*.107,1.672,.108),
+                 (s*.090,1.585,.138),(s*.034,1.666,.099)], [(0,1,2,3)], "TopShade", "Chest", outfit)
+            rounded("Chest pocket", (s*.118,1.465,.129), (.075,.087,.012), "TopShade", torso_weights, .006, outfit)
+        for y in [1.23,1.36,1.48]:
+            rounded("Garment button", (s*.049,y,.14), (.011,.011,.005), "Metal", torso_weights, .003, outfit)
+    obj = poly("Connected sloped garment",vertices,faces,"Top",garment_weights,outfit)
+    obj["shoulder_drop"] = .047
+
+
 def clothes():
-    loft("Cotton inner tee", [(0,1.17,0,.171,.112),(0,1.34,0,.178,.115),(0,1.56,0,.223,.116),
-         (0,1.655,0,.245,.105),(0,1.69,0,.089,.071)], "Undershirt", torso_weights, 12)
+    loft("Cotton inner tee", [(0,1.17,0,.171,.112),(0,1.34,0,.173,.115),
+         (0,1.56,0,.192,.116),(0,1.615,0,.20,.09),(0,1.69,0,.082,.068)],
+         "Undershirt",torso_weights,12)
     for outfit in ["shirt","jacket","cardigan"]:
-        width = .235 if outfit == "shirt" else .251
-        hem = 1.17 if outfit == "shirt" else 1.11
-        for side, s in [("L",-1),("R",1)]:
-            poly("Open garment front", [(s*.04,hem,.127),(s*.195,hem,.098),(s*width,1.6,.107),
-                 (s*.232,1.69,.087),(s*.071,1.68,.087),(s*.077,1.49,.14)], [(0,1,2,3,4,5)], "Top", torso_weights, outfit)
-            poly("Garment side", [(s*.195,hem,.098),(s*.189,hem,-.118),(s*width,1.6,-.105),(s*width,1.6,.107)], [(0,1,2,3)], "TopShade", torso_weights, outfit)
-            poly("Connected shoulder yoke", [(s*.071,1.68,.087),(s*.232,1.69,.087),(s*.33,1.655,.058),
-                 (s*.33,1.655,-.058),(s*.23,1.69,-.082),(s*.071,1.68,-.077)],
-                 [(0,1,4,5),(1,2,3,4)], "Top", arm_weights(side), outfit)
-            length = 1.335 if outfit == "shirt" else 1.1
-            loft(f"{outfit} sleeve {side}", [(s*.254,1.674,0,.09,.086),(s*.29,1.54,0,.076,.077),
-                 (s*.322,1.39,0,.065,.064),(s*.33,length,0,.055,.053)], "Top", arm_weights(side), 8, outfit)
-            if outfit != "shirt":
-                loft("Folded sleeve cuff", [(s*.33,length-.006,0,.058,.055),(s*.33,length+.05,0,.06,.057)], "TopShade", f"Forearm_{side}", 8, outfit)
-            if outfit != "cardigan":
-                poly("Crisp folded collar", [(s*.053,1.718,.062),(s*.132,1.678,.119),(s*.108,1.562,.139),(s*.033,1.665,.099)],
-                     [(0,1,2,3)], "TopShade", "Chest", outfit)
-                rounded("Chest pocket", (s*.15,1.49,.131), (.096,.105,.014), "TopShade", torso_weights, .008, outfit)
-            for y in [1.23,1.36,1.48]:
-                rounded("Garment button", (s*.06,y,.143), (.013,.013,.006), "Metal", torso_weights, .004, outfit)
-        poly("Garment back", [(-.19,hem,-.118),(.19,hem,-.118),(width,1.6,-.105),(.23,1.69,-.082),
-             (-.23,1.69,-.082),(-width,1.6,-.105)], [(0,1,2,3,4,5)], "Top", torso_weights, outfit)
+        garment_shell(outfit)
 
 
 def hair():
@@ -247,11 +304,11 @@ def accessories():
         line("Angular glasses frame", bcoords+[bcoords[0]], .006, "Glasses", "Head", accessory="glasses")
         line("Glasses temple", [(s*.097,1.994,.164),(s*.14,1.986,.028)], .0045, "Glasses", "Head", accessory="glasses")
     line("Glasses bridge", [(-.013,1.982,.165),(0,1.988,.168),(.013,1.982,.165)], .005, "Glasses", "Head", accessory="glasses")
-    rounded("Fork handle", (.345,.949,.025), (.022,.124,.012), "Metal", "Hand_R", .007, accessory="fork")
-    rounded("Fork shoulder", (.345,.871,.025), (.034,.047,.009), "Metal", "Hand_R", .004, accessory="fork")
+    rounded("Fork handle", (.282,.934,.025), (.022,.124,.012), "Metal", "Hand_R", .007, accessory="fork")
+    rounded("Fork shoulder", (.282,.856,.025), (.034,.047,.009), "Metal", "Hand_R", .004, accessory="fork")
     for i in range(3):
-        rounded("Fork prong", (.333+i*.012,.843,.025), (.005,.035,.007), "Metal", "Hand_R", .001, accessory="fork")
-    rounded("Fork bite", (.345,.833,.027), (.036,.027,.033), "Food", "UtensilTip", .009, accessory="bite")
+        rounded("Fork prong", (.270+i*.012,.828,.025), (.005,.035,.007), "Metal", "Hand_R", .001, accessory="fork")
+    rounded("Fork bite", (.282,.818,.027), (.036,.027,.033), "Food", "UtensilTip", .009, accessory="bite")
     # A hidden degenerate point keeps the non-deforming IK target in the glTF skin.
     poly("IK target binding", [(0.1,1.6,.3)]*3, [(0,1,2)], "Skin", "HandTarget", accessory="ik-helper")
 

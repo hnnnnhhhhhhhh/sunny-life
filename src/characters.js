@@ -165,8 +165,9 @@ class ResidentAnimator {
       pose.scale.copy(pose.bone.scale);
     }
     const { avatar, bones } = this;
-    bones.get('Hips').scale.x = avatar.build;
-    bones.get('Head').scale.x = avatar.face / avatar.build;
+    bones.get('Chest').scale.x = avatar.build;
+    bones.get('Neck').scale.x = 1 / avatar.build;
+    bones.get('Head').scale.x = avatar.face;
     bones.get('Nose').scale.setScalar(avatar.nose);
     const blinkPhase = this.time % 4.7;
     const blink = blinkPhase > 4.48 ? Math.max(0.1, Math.abs((blinkPhase - 4.59) / 0.11)) : 1;
@@ -238,6 +239,7 @@ class ResidentAnimator {
       artist: manifest.artist || 'Sunny Life',
       mouth: this.point('Mouth').toArray(), hand: this.point('Hand_R').toArray(),
       hips: this.point('Hips').toArray(), head: this.point('Head').toArray(),
+      shoulders: ['UpperArm_L','UpperArm_R'].map(name=>this.point(name).toArray()),
       fork: tip.toArray(), target: this.lastTarget?.toArray() || null,
       targetDistance: this.lastTarget ? tip.distanceTo(this.lastTarget) : null,
       feet: ['Foot_L', 'Foot_R'].map(name => this.point(name).toArray()),

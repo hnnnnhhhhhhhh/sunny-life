@@ -96,6 +96,8 @@ npm run resident:rebuild
 - 骨骼校正始终基于当帧动画姿态重新计算，不叠加到上一帧 IK 结果。
 - 餐椅接近点、坐点、桌面高度由 `src/interactions.js` 定义；动作阶段与需求恢复统一由 `src/activity-runner.js` 驱动。
 - `artist_parts.py` 保留前侧下颌，将原始颈根调整到当前身体比例，再从共享截口顶点延伸连接环到衣领内；低处使用 Chest/Neck 混合权重。不能删除这段连接后只移动头部来隐藏缝隙。
-- 衣服肩片连接前后片与袖顶，袖顶使用 Chest/UpperArm 混合权重。角色特写以实际身高确定取景目标。
+- 三套衣服采用连续躯干与八点袖笼，肩袖共用顶点和 Chest/UpperArm 过渡权重；不再靠独立肩片遮盖袖顶。颈部底座应藏在后领内。
+- 肩宽参数只调整 Chest，由 Neck 补偿以保留脸部尺寸；髋部和双脚不跟着横向拉伸。具体比例及验证范围见 [居民比例](../references/resident-proportions.md)。
+- 角色特写以实际身高确定取景目标。
 
 参考资料与官方视频截帧说明位于 `art/references/character-and-dining.md` 和 `art/references/live-mode-hud.md`。授权原文位于 `art/vendor/quaternius/LICENSE.txt`，改动说明位于同目录 README。没有使用从《模拟人生》提取的专有资源。

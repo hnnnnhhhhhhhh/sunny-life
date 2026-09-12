@@ -117,12 +117,12 @@ def connect_neck(obj, material):
     center = sum((v.co for v in vertices), Vector()) / len(vertices)
     edges = [(edge.verts[0], edge.verts[1]) for edge in rim]
     uv = bm.loops.layers.uv.active
-    for height, rx, ry in [(1.715, 0.068, 0.064), (1.675, 0.085, 0.075), (1.61, 0.135, 0.105)]:
+    for height, rx, ry, cy in [(1.715, 0.068, 0.060, 0.022), (1.675, 0.085, 0.058, 0.01), (1.61, 0.10, 0.065, 0)]:
         next_ring = {}
         for vertex in vertices:
             radial = Vector((vertex.co.x - center.x, vertex.co.y - center.y))
             radial.normalize()
-            next_ring[vertex] = bm.verts.new((radial.x * rx, center.y + radial.y * ry, height))
+            next_ring[vertex] = bm.verts.new((radial.x * rx, cy + radial.y * ry, height))
         for a, b in edges:
             face = bm.faces.new((a, b, next_ring[b], next_ring[a]))
             face.material_index = len(obj.data.materials)
@@ -132,6 +132,7 @@ def connect_neck(obj, material):
                     loop[uv].uv = (0, 0)
         edges = [(next_ring[a], next_ring[b]) for a, b in edges]
         vertices = set(next_ring.values())
+        center = Vector((0, cy, height))
     cap = bmesh.ops.holes_fill(bm, edges=[edge for edge in bm.edges if edge.is_boundary and all(v.co.z < 1.62 for v in edge.verts)])
     for face in cap["faces"]:
         face.material_index = len(obj.data.materials)
