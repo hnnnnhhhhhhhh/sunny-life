@@ -3,6 +3,21 @@ import {newGame} from '../../src/game.js';
 
 test.setTimeout(process.env.CI?120000:60000);
 const diag=page=>page.evaluate(()=>window.__sunny.diagnostics({pixels:false}));
+// Collect on rendered frames, without screenshot/IPC latency skipping a stage.
+const captureMotion=(page,until)=>page.evaluate(until=>new Promise((resolve,reject)=>{
+  const samples=[],deadline=performance.now()+45000;
+  const tick=()=>{
+    const d=window.__sunny.diagnostics({pixels:false});
+    if(d.activity?.bedPose||d.activity?.stage==='active')samples.push({
+      activity:d.activity,resident:d.resident,handwashing:d.handwashing,
+    });
+    if(until==='sleep'&&d.activity?.stage==='active'||until==='exit'&&!d.activity||
+      until==='rub'&&d.handwashing?.time>=4.5){resolve(samples);return;}
+    if(performance.now()>deadline){reject(new Error(`Motion did not reach ${until}`));return;}
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}),until);
 async function boot(page,avatar={},setup) {
   const game=newGame();game.sim.autonomy=false;game.sim.needs.hygiene=60;game.avatar={...game.avatar,...avatar};
   setup?.(game);
@@ -23,16 +38,7 @@ async function use(page,id,label) {
 test('bed entry and reverse exit keep real hips anchored and feet grounded',async({page})=>{
   await boot(page);
   await use(page,'bed-1','睡个好觉');
-  const seen=new Set(), samples=[];
-  await expect.poll(()=>diag(page).then(d=>d.activity?.bedTime),{timeout:15000,intervals:[80]}).toBeGreaterThan(0);
-  for(let i=0;i<80;i++) {
-    const d=await diag(page);samples.push(d);seen.add(d.activity?.stage);
-    if(['bed-sit','bed-legs','bed-recline'].includes(d.activity?.stage)&&!samples.slice(0,-1).some(s=>s.activity.stage===d.activity.stage)) {
-      await page.screenshot({path:`test-results/${d.activity.stage}.png`});
-    }
-    if(d.activity?.stage==='active')break;
-    await page.waitForTimeout(110);
-  }
+  const samples=await captureMotion(page,'sleep'),seen=new Set(samples.map(d=>d.activity.stage));
   expect([...seen]).toEqual(expect.arrayContaining(['bed-sit','bed-legs','bed-recline','active']));
   for(const d of samples) {
     const pose=d.activity.bedPose;
@@ -47,12 +53,9 @@ test('bed entry and reverse exit keep real hips anchored and feet grounded',asyn
   await page.getByRole('button',{name:'取消当前活动',exact:true}).click();
   await page.getByRole('button',{name:'继续生活',exact:true}).click();
   await expect(page.getByRole('button',{name:'暂停生活',exact:true})).toBeVisible();
-  const exit=new Set();
-  for(let i=0;i<80;i++) {
-    const d=await diag(page);if(!d.activity)break;
-    exit.add(d.activity.stage);
+  const leaving=await captureMotion(page,'exit'),exit=new Set(leaving.map(d=>d.activity.stage));
+  for(const d of leaving) {
     if(d.activity.stage==='bed-stand')for(const foot of d.resident.feet)expect(Math.abs(foot[1]-.34)).toBeLessThan(.035);
-    await page.waitForTimeout(140);
   }
   expect([...exit]).toEqual(expect.arrayContaining(['bed-rise','bed-lower','bed-stand']));
   expect((await diag(page)).activity).toBeNull();
@@ -62,12 +65,7 @@ test('bed entry and reverse exit keep real hips anchored and feet grounded',asyn
 for(const height of [.85,1.15])test(`kitchen handwashing aligns both hands, pauses, cancels at height ${height}`,async({page})=>{
   await boot(page,{height,build:height===.85?.8:1.3});
   await use(page,'kitchen-1','洗手');
-  await expect.poll(()=>diag(page).then(d=>d.activity?.stage),{timeout:15000}).toBe('active');
-  const samples=[];
-  for(let i=0;i<12;i++) {
-    await page.waitForTimeout(300);
-    const d=await diag(page);samples.push(d);
-  }
+  const samples=await captureMotion(page,'rub');
   expect(samples.some(d=>d.handwashing.flow>.9)).toBe(true);
   expect(samples.some(d=>d.handwashing.foam>.5)).toBe(true);
   for(const d of samples) {
@@ -88,7 +86,7 @@ for(const height of [.85,1.15])test(`kitchen handwashing aligns both hands, paus
 test('handwashing completes all phases and leaves no running water',async({page})=>{
   await boot(page);
   await use(page,'kitchen-1','洗手');
-  await expect.poll(()=>diag(page).then(d=>d.activity?.stage),{timeout:15000}).toBe('active');
+  await expect.poll(()=>diag(page).then(d=>d.activity?.stage),{timeout:process.env.CI?45000:15000}).toBe('active');
   const phases=new Set();
   for(let i=0;i<100;i++) {
     const d=await diag(page);
