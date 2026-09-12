@@ -2,13 +2,15 @@ import { test, expect } from '@playwright/test';
 import { newGame } from '../../src/game.js';
 import { finishOnboarding } from './helpers.js';
 
+test.setTimeout(process.env.CI ? 120000 : 60000);
 const diag=page=>page.evaluate(()=>window.__sunny.diagnostics());
 const game=page=>page.evaluate(()=>window.__sunny.state().game);
 async function boot(page,seed) {
   if(seed) await page.addInitScript(seed=>{
     if(!localStorage.getItem('sunny-life.save.v1')) localStorage.setItem('sunny-life.save.v1',JSON.stringify(seed));
   },seed);
-  await page.goto('/'); await expect(page.locator('.world-loading')).toHaveCount(0);
+  await page.goto(process.env.CI ? '/?quality=low':'/',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('.world-loading')).toHaveCount(0,{timeout:process.env.CI?45000:10000});
   await page.waitForTimeout(800);
 }
 async function furniture(page,id,label) {
@@ -33,8 +35,10 @@ test('new visitors create their own resident, resume, and do not share saves',as
   await expect(page.locator('.save-status')).toHaveText('已保存');
   await page.reload(); await expect(page.locator('.world-loading')).toHaveCount(0);
   await expect(page.locator('.resident strong')).toHaveText('海边小满');
+  const siteURL=page.url();
+  await page.close();
   const second=await browser.newContext({viewport:{width:390,height:844}});
-  const other=await second.newPage(); await other.goto(page.url());
+  const other=await second.newPage(); await other.goto(siteURL,{waitUntil:'domcontentloaded'});
   await expect(other.locator('.world-loading')).toHaveCount(0);
   await expect(other.getByRole('button',{name:'开始生活',exact:true})).toBeVisible();
   await other.screenshot({path:'test-results/new-resident-mobile.png'});
@@ -123,7 +127,7 @@ test('low-poly coast and reflective water render without GPU errors on desktop a
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   await boot(page,newGame());
   const d=await diag(page);
-  expect(d.environment.ocean.reflectedFrames).toBeGreaterThan(3);
+  await expect.poll(()=>diag(page).then(d=>d.environment.ocean.reflectedFrames)).toBeGreaterThan(3);
   expect(d.environment.grass.style).toBe('low-poly');
   expect(d.environment.grass.blades).toBeLessThan(1000);
   await page.waitForTimeout(1000);

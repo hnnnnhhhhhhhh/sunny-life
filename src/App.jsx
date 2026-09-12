@@ -7,7 +7,7 @@ import {
   Palette, Pause, Play, Plus, Redo2, RotateCw, Save, Scissors,
   Search, Settings2, Shirt, Shuffle, Smile, Sofa, Sparkles, Sprout, Sun,
   Trash2, Undo2, Utensils, UtensilsCrossed, X, Zap, ZoomIn, ZoomOut,
-  Bath, Camera, ChevronUp, DoorOpen, Scan, Square, RotateCcw, Toilet, ShowerHead, Box as BoxIcon, Fish, FishSymbol,
+  Bath, Camera, ChevronUp, DoorOpen, Scan, Square, RotateCcw, Toilet, ShowerHead, Box as BoxIcon, Fish, FishSymbol, Gauge,
 } from 'lucide-react';
 import {
   ACTIVITIES, CATALOG, CLOTHES_COLORS, FLOOR_STYLES, HAIR_COLORS,
@@ -148,6 +148,7 @@ export default function App({ modelWarning = false }) {
   const [roof, setRoof] = useState(false);
   const [cutaway, setCutaway] = useState(true);
   const [perspective, setPerspective] = useState(false);
+  const [lowQuality,setLowQuality]=useState(()=>new URLSearchParams(window.location.search).get('quality')==='low' || navigator.hardwareConcurrency<=4);
   const [evening, setEvening] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [category, setCategory] = useState('all');
@@ -170,7 +171,7 @@ export default function App({ modelWarning = false }) {
   const [mobilePanel, setMobilePanel] = useState(false);
   const worldNode = useRef(null), world = useRef(null), eventHandler = useRef(null);
   const latest = useRef(null), toastTimer = useRef(null), catalogue = useRef(null), fileInput = useRef(null);
-  latest.current = { ...state, mode, tool, selected, pending, roof, cutaway, showGrid, speed, draft, wallStart, evening, activity, propertiesOpen: mobilePanel, catalogOpen };
+  latest.current = { ...state, mode, tool, selected, pending, roof, cutaway, lowQuality, showGrid, speed, draft, wallStart, evening, activity, propertiesOpen: mobilePanel, catalogOpen };
   const selectedObject = game.home.furniture.find(f => f.id === selected);
   const selectedInfo = selectedObject && ITEM_MAP[selectedObject.type];
   const filtered = useMemo(() => CATALOG.filter(item => (category === 'all' || item.category === category) && `${item.name}${item.detail}`.includes(search.trim())), [category, search]);
@@ -505,6 +506,7 @@ export default function App({ modelWarning = false }) {
           <IconButton icon={Grid2X2} label="显示建造网格" active={showGrid} onClick={() => setShowGrid(v => !v)} />
           <IconButton icon={MapIcon} label="青禾镇地图" onClick={() => setModal('map')} />
           <IconButton icon={Footprints} label="跟随居民" onClick={() => world.current?.command('follow')} />
+          <IconButton icon={Gauge} label="轻量画质" active={lowQuality} onClick={()=>setLowQuality(value=>!value)} />
         </div></details>
       </div>
     </>}

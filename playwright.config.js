@@ -14,7 +14,7 @@ export default defineConfig({
     viewport: { width: 1440, height: 1000 },
     launchOptions: {
       ...(existsSync(cachedChromium) ? { executablePath: cachedChromium } : {}),
-      args: ['--enable-webgl', '--ignore-gpu-blocklist'],
+      args: ['--enable-webgl', '--ignore-gpu-blocklist', ...(process.env.CI ? ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] : [])],
     },
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',

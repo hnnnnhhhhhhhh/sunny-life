@@ -31,9 +31,10 @@ export class World {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#c4d7d3');
     this.scene.fog = new THREE.Fog('#c4d7d3', 80, 155);
+    const lowQuality=new URLSearchParams(window.location.search).get('quality')==='low' || navigator.hardwareConcurrency<=4;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.setPixelRatio(lowQuality?0.5:Math.min(window.devicePixelRatio, 1.75));
+    this.renderer.shadowMap.enabled = !lowQuality;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -75,6 +76,7 @@ export class World {
     this.sun.shadow.radius = 3;
     this.scene.add(this.sun);
     this.environmentSystem = createEnvironment();
+    this.environmentSystem.ocean.setQuality(lowQuality);
     this.environment = this.environmentSystem.root;
     this.scene.add(this.environment);
     this.worldRoot = new THREE.Group();
@@ -181,6 +183,15 @@ export class World {
     this.state = state;
     const { game, mode, selected, pending, roof } = state;
     const { home, avatar } = game;
+    if(state.lowQuality!==old?.lowQuality) {
+      this.renderer.setPixelRatio(state.lowQuality?0.5:Math.min(window.devicePixelRatio,1.75));
+      this.renderer.shadowMap.enabled=!state.lowQuality;
+      const shadowSize=state.lowQuality?512:2048;
+      this.sun.shadow.mapSize.set(shadowSize,shadowSize);
+      this.sun.shadow.map?.dispose(); this.sun.shadow.map=null;
+      this.environmentSystem.ocean.setQuality(state.lowQuality);
+      this.resize();
+    }
     if (!game.sim.autonomy && this.activities.current?.autonomous && this.activities.current.stage !== 'cancelling') this.activities.cancel(false);
     if (state.propertiesOpen !== old?.propertiesOpen || state.catalogOpen !== old?.catalogOpen) this.updateProjection();
     if (this.activities.current && (mode !== old?.mode || home !== old?.game.home || avatar !== old?.game.avatar || state.loadVersion !== old?.loadVersion)) {
@@ -492,14 +503,15 @@ export class World {
   animate(time) {
     if (this.disposed) return;
     this.frame = requestAnimationFrame(t => this.animate(t));
-    const dt = Math.min((time - this.lastTime) / 1000, 0.05);
+    const dt = Math.min((time - this.lastTime) / 1000, 0.25);
     this.lastTime = time;
     this.environmentSystem.update(time);
     if (this.cameraTransition) {
       const t = this.cameraTransition;
-      this.camera.position.lerp(t.position, 0.11);
-      this.controls.target.lerp(t.target, 0.11);
-      this.camera.zoom = THREE.MathUtils.lerp(this.camera.zoom, t.zoom, 0.11);
+      const blend=1-Math.exp(-7*dt);
+      this.camera.position.lerp(t.position, blend);
+      this.controls.target.lerp(t.target, blend);
+      this.camera.zoom = THREE.MathUtils.lerp(this.camera.zoom, t.zoom, blend);
       this.camera.updateProjectionMatrix();
       if (this.camera.position.distanceTo(t.position) < 0.015 && Math.abs(this.camera.zoom - t.zoom) < 0.002) this.cameraTransition = null;
     }
@@ -507,23 +519,22 @@ export class World {
       const { mode, game, speed } = this.state;
       const walking = mode === 'live' && speed > 0 && this.path.length > 0;
       if (walking) {
-        const next = this.path[0], pos = this.player.position;
-        const dx = next.x - pos.x, dz = next.z - pos.z, distance = Math.hypot(dx, dz);
-        const step = dt * 2.5 * speed;
-        if (distance <= step) {
-          pos.x = next.x; pos.z = next.z; this.path.shift();
-          if (!this.path.length) {
-            this.destination.visible = false;
-            this.emit({ type: 'position', x: pos.x, z: pos.z });
-            if (!this.activities.arrive()) {
-              this.emit({ type: 'arrived' });
-              if (this.arrivalActivity) this.activities.genericAfterWalk(this.arrivalActivity);
-            }
-            this.arrivalActivity = null;
+        const pos = this.player.position;
+        let step=dt*2.5*speed;
+        while(this.path.length && step>0) {
+          const next=this.path[0],dx=next.x-pos.x,dz=next.z-pos.z,distance=Math.hypot(dx,dz);
+          if(distance>0.001)this.player.rotation.y=Math.atan2(dx,dz);
+          if(distance<=step) {
+            pos.x=next.x;pos.z=next.z;this.path.shift();step-=distance;
+          } else {
+            pos.x+=dx/distance*step;pos.z+=dz/distance*step;step=0;
           }
-        } else {
-          pos.x += dx / distance * step; pos.z += dz / distance * step;
-          this.player.rotation.y = Math.atan2(dx, dz);
+        }
+        if(!this.path.length) {
+          this.destination.visible=false;
+          this.emit({type:'position',x:pos.x,z:pos.z});
+          if(!this.activities.arrive())this.emit({type:'arrived'});
+          this.arrivalActivity=null;
         }
         pos.y = surfaceHeight(game.home, pos.x, pos.z) + Math.abs(Math.sin(time * 0.009 * speed)) * 0.026;
         if (time - this.lastPositionEmit > 1500) {

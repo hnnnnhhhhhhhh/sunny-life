@@ -95,11 +95,14 @@ export function createOcean() {
   const shore = shoreTexture();
   mesh.material.uniforms.uShore.value = shore;
   const renderReflection = mesh.onBeforeRender;
-  let reflectedFrames = 0;
+  let reflectedFrames = 0, lowQuality = false, lastReflection = -Infinity;
   mesh.onBeforeRender = (renderer, scene, camera) => {
     mesh.material.uniforms.uEye.value.setFromMatrixPosition(camera.matrixWorld);
     camera.getWorldDirection(mesh.material.uniforms.uView.value);
     mesh.material.uniforms.uOrtho.value = camera.isOrthographicCamera ? 1 : 0;
+    const now=performance.now();
+    if(lowQuality && now-lastReflection<250) return;
+    lastReflection=now;
     const before = scene.onBeforeRender;
     // Reflector's built-in oblique clip assumes perspective. The general
     // inverse-projection form also clips correctly for our orthographic camera.
@@ -127,9 +130,15 @@ export function createOcean() {
   };
   return {
     mesh,
+    setQuality(low) {
+      lowQuality=low;
+      const size=low?192:512;
+      mesh.getRenderTarget().setSize(size,size);
+      lastReflection=-Infinity;
+    },
     update(time) { mesh.material.uniforms.uTime.value = time * 0.001; },
     time() { return mesh.material.uniforms.uTime.value; },
-    diagnostics() { return { reflectedFrames, style: 'shallow-reflective', shoreResolution: 256 }; },
+    diagnostics() { return { reflectedFrames, style: 'shallow-reflective', shoreResolution: 256, lowQuality }; },
     dispose() { mesh.dispose(); mesh.geometry.dispose(); shore.dispose(); },
   };
 }
