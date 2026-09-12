@@ -1,0 +1,21 @@
+{
+  "generator": "Blender 4.5.3 LTS",
+  "file": "models/resident/resident.glb",
+  "source": "art/blender/sunny-resident.blend",
+  "bytes": 4407480,
+  "sha256": "8b207d1ef4139209b79192c711f39cb9a60132abb193a2fc468b4814a3845c90",
+  "height": 2.25,
+  "hipHeight": 1.08,
+  "animations": [
+    "Idle",
+    "Walk",
+    "SitDown",
+    "SitIdle",
+    "Eat",
+    "StandUp",
+    "Talk",
+    "Listen"
+  ],
+  "artist": "Quaternius, Universal Base Characters (CC0)",
+  "sourceUrl": "https://quaternius.com/packs/universalbasecharacters.html"
+}

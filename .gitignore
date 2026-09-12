@@ -1,0 +1,15 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+.runtime/
+art/blender/*.blend[0-9]*
+art/blender/__pycache__/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+coverage/
+*.pem
+*.key

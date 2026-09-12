@@ -1,0 +1,192 @@
+import { test, expect } from '@playwright/test';
+import { finishOnboarding } from './helpers.js';
+
+async function boot(page, editing = false, properties = false) {
+  await page.goto('/');
+  await expect(page.getByTestId('world-canvas')).toBeVisible();
+  await expect(page.locator('.world-loading')).toHaveCount(0);
+  await finishOnboarding(page);
+  await page.waitForFunction(() => !!window.__sunny?.diagnostics()?.triangles);
+  await page.waitForTimeout(850);
+  if (editing) await page.getByRole('button', { name: '建造', exact: true }).click();
+  if (properties) await page.getByRole('button', { name: '房屋属性', exact: true }).click();
+}
+async function worldClick(page, x, z, y = 0.25) {
+  const point = await page.evaluate(({ x, y, z }) => window.__sunny.project(x, y, z), { x, y, z });
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.click(point.x, point.y);
+}
+const read = (page, key) => page.evaluate(key => {
+  const state = window.__sunny.state();
+  if (key === 'furniture') return state.game.home.furniture;
+  if (key === 'walls') return state.game.home.walls;
+  if (key === 'budget') return state.game.budget;
+  if (key === 'avatar') return state.game.avatar;
+  if (key === 'home') return state.game.home;
+  return state[key];
+}, key);
+
+test('furniture placement, rotation, collision, move, refund, undo and persistence', async ({ page }) => {
+  await boot(page, true);
+  await page.getByRole('button', { name: '放置拥抱休闲椅' }).click();
+  await page.getByRole('button', { name: '旋转待放置家具' }).click();
+  await worldClick(page, -3, -2.5);
+  await expect.poll(() => read(page, 'furniture').then(f => f.length)).toBe(16);
+  await expect(page.getByRole('status', { name: '游戏通知' })).toContainText('家具');
+  await worldClick(page, -3.5, 6);
+  await expect.poll(() => read(page, 'furniture').then(f => f.length)).toBe(17);
+  let added = (await read(page, 'furniture')).at(-1);
+  expect(added.rotation).toBeCloseTo(Math.PI / 2);
+  expect(await read(page, 'budget')).toBe(28010);
+  await page.keyboard.press('r');
+  await expect.poll(() => read(page, 'furniture').then(f => f.at(-1).rotation)).toBeCloseTo(Math.PI);
+  await page.getByRole('button', { name: '移动', exact: true }).click();
+  await worldClick(page, 4, 6);
+  await expect.poll(() => read(page, 'furniture').then(f => f.at(-1).x)).toBe(4);
+  expect(await read(page, 'budget')).toBe(28010);
+  await page.getByRole('button', { name: '收回', exact: true }).click();
+  await expect.poll(() => read(page, 'furniture').then(f => f.length)).toBe(16);
+  expect(await read(page, 'budget')).toBe(28650);
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect.poll(() => read(page, 'furniture').then(f => f.length)).toBe(17);
+  await page.getByRole('button', { name: '重做', exact: true }).click();
+  await expect.poll(() => read(page, 'furniture').then(f => f.length)).toBe(16);
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(page.locator('.save-status')).toHaveText('已保存');
+  await page.reload();
+  await page.getByRole('button', { name: '建造', exact: true }).click();
+  await page.getByRole('button', { name: '房屋属性', exact: true }).click();
+  await expect(page.getByTestId('furniture-count')).toHaveText('17件');
+  expect((await read(page, 'furniture')).at(-1).x).toBe(4);
+  expect(await read(page, 'budget')).toBe(28010);
+});
+
+test('walls, surface materials and guarded home dimensions are editable', async ({ page }) => {
+  await boot(page, true, true);
+  await page.getByRole('button', { name: '建造墙体', exact: true }).click();
+  await worldClick(page, 0.5, 0);
+  await worldClick(page, 0.5, 2);
+  await expect.poll(() => read(page, 'walls').then(w => w.length)).toBe(5);
+  expect(await read(page, 'budget')).toBe(28550);
+  await page.getByRole('button', { name: '拆除家具或墙体', exact: true }).click();
+  await worldClick(page, 0.5, 1, 0.4);
+  await expect.poll(() => read(page, 'walls').then(w => w.length)).toBe(4);
+  expect(await read(page, 'budget')).toBe(28650);
+  await page.getByRole('button', { name: '房屋属性', exact: true }).click();
+  await page.getByRole('button', { name: '材质与配色', exact: true }).click();
+  await page.getByRole('button', { name: '墙面颜色 3', exact: true }).click();
+  await page.getByRole('button', { name: '胡桃木', exact: true }).click();
+  await expect.poll(() => read(page, 'home').then(h => h.floor)).toBe('walnut');
+  expect((await read(page, 'home')).wallColor).toBe('#b3c9cc');
+  await page.getByRole('button', { name: '空间设置', exact: true }).click();
+  const width = page.getByRole('slider', { name: '宽度', exact: true });
+  await width.focus();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('status', { name: '游戏通知' })).toContainText('扩建');
+  expect((await read(page, 'home')).width).toBe(12);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => read(page, 'home').then(h => h.width)).toBe(12);
+  await page.keyboard.press('Home');
+  await expect(page.getByRole('status', { name: '游戏通知' })).toContainText('移开');
+  expect((await read(page, 'home')).width).toBe(12);
+  await page.getByLabel('镜头设置', { exact: true }).click();
+  await page.getByRole('button', { name: '显示屋顶', exact: true }).click();
+  await expect.poll(() => read(page, 'roof')).toBe(true);
+  await page.getByRole('button', { name: '隐藏屋顶', exact: true }).click();
+});
+
+test('character customization applies to the world, persists, and supports cancellation', async ({ page }) => {
+  await boot(page);
+  await page.getByRole('button', { name: '角色', exact: true }).click();
+  await page.getByRole('textbox', { name: '居民姓名' }).fill('夏小禾');
+  await page.getByRole('button', { name: '肤色 3', exact: true }).click();
+  await page.getByRole('button', { name: '柔和', exact: true }).click();
+  await page.getByRole('slider', { name: '眼睛大小' }).focus();
+  await page.keyboard.press('End');
+  await page.getByRole('tab', { name: '发型', exact: true }).click();
+  await page.getByRole('button', { name: '自然卷', exact: true }).click();
+  await page.getByRole('button', { name: '发色 3', exact: true }).click();
+  await page.getByRole('tab', { name: '穿搭', exact: true }).click();
+  await page.getByRole('button', { name: '上衣颜色 4', exact: true }).click();
+  await page.getByRole('switch', { name: '圆框眼镜' }).click();
+  await page.getByRole('tab', { name: '性格', exact: true }).click();
+  await page.getByRole('button', { name: '创意满满', exact: true }).click();
+  await page.getByRole('button', { name: '完成形象', exact: true }).click();
+  await expect.poll(() => read(page, 'mode')).toBe('live');
+  const avatar = await read(page, 'avatar');
+  expect(avatar).toMatchObject({ name: '夏小禾', skin: '#ca9571', face: 1.13, eyes: 1.2, hair: 'curly', hairColor: '#ba8c52', top: '#81a7b8', glasses: true });
+  expect(avatar.traits).toContain('创意满满');
+  await expect(page.locator('.save-status')).toHaveText('已保存');
+  await page.reload();
+  await expect(page.locator('.resident strong')).toHaveText('夏小禾');
+  await page.getByRole('button', { name: '角色', exact: true }).click();
+  await page.getByRole('textbox', { name: '居民姓名' }).fill('未保存的新名字');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  expect((await read(page, 'avatar')).name).toBe('夏小禾');
+});
+
+test('life mode walks outside, pauses time, and completes furniture activities', async ({ page }) => {
+  await boot(page);
+  await page.getByRole('button', { name: '生活', exact: true }).click();
+  await page.waitForTimeout(1000);
+  await page.getByRole('button', { name: '3倍速' }).click();
+  const before = await page.evaluate(() => window.__sunny.diagnostics().position);
+  await worldClick(page, 1, 7, 0);
+  await expect.poll(() => page.evaluate(() => window.__sunny.diagnostics().position[2])).toBeGreaterThan(6.5);
+  const after = await page.evaluate(() => window.__sunny.diagnostics().position);
+  expect(Math.hypot(after[0] - before[0], after[2] - before[2])).toBeGreaterThan(3);
+  await page.getByRole('button', { name: '暂停生活', exact: true }).click();
+  const time = await page.evaluate(() => window.__sunny.state().game.sim.time);
+  await page.waitForTimeout(1400);
+  expect(await page.evaluate(() => window.__sunny.state().game.sim.time)).toBe(time);
+  await page.getByRole('button', { name: '3倍速' }).click();
+  await worldClick(page, 3.35, 2.4, 1.05);
+  await expect(page.getByRole('button', { name: '睡个好觉', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '睡个好觉', exact: true }).click();
+  await expect(page.locator('.activity-progress')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('.activity-progress')).toHaveCount(0, { timeout: 20000 });
+  const energy = await page.evaluate(() => window.__sunny.state().game.sim.needs.energy);
+  expect(energy).toBeGreaterThan(95);
+  await page.screenshot({ path: 'test-results/desktop-live.png' });
+});
+
+test('save export/import validates contents and restores the whole world', async ({ page }) => {
+  await boot(page);
+  await page.getByRole('button', { name: '存档管理', exact: true }).click();
+  const downloaded = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出存档 Sunny Life · JSON', exact: true }).click();
+  const download = await downloaded;
+  expect(download.suggestedFilename()).toContain('.json');
+  const exported = await read(page, 'game');
+  exported.avatar.name = '归来的小禾';
+  exported.home.floor = 'birch';
+  await page.locator('input[type=file]').setInputFiles({ name: 'save.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported)) });
+  await page.getByRole('button', { name: '生活', exact: true }).click();
+  await expect(page.locator('.resident strong')).toHaveText('归来的小禾');
+  expect((await read(page, 'home')).floor).toBe('birch');
+  await page.getByRole('button', { name: '存档管理', exact: true }).click();
+  await page.locator('input[type=file]').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('{"version":1,"home":{}}') });
+  await expect(page.getByRole('status', { name: '游戏通知' })).toContainText('未受影响');
+  expect((await read(page, 'avatar')).name).toBe('归来的小禾');
+  await page.getByRole('button', { name: '关闭', exact: true }).click();
+});
+
+test('mobile controls place furniture, edit residents, and remain within the viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await boot(page, true);
+  await page.getByRole('button', { name: '放置拥抱休闲椅' }).click();
+  await worldClick(page, 4, 6);
+  await expect.poll(() => read(page, 'furniture').then(f => f.length)).toBe(17);
+  await expect(page.getByRole('button', { name: '收回', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '收回', exact: true }).click();
+  await expect.poll(() => read(page, 'furniture').then(f => f.length)).toBe(16);
+  await page.getByRole('button', { name: '收起房屋属性', exact: true }).click();
+  await page.getByRole('button', { name: '角色', exact: true }).click();
+  await page.getByRole('tab', { name: '发型', exact: true }).click();
+  await page.getByRole('button', { name: '丸子头', exact: true }).click();
+  await page.getByRole('button', { name: '完成形象', exact: true }).click();
+  await expect.poll(() => read(page, 'avatar').then(a => a.hair)).toBe('bun');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/mobile-live.png' });
+});

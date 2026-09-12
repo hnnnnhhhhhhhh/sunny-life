@@ -1,0 +1,178 @@
+.compact-hud { min-height: 0; }
+.compact-hud .game-header { top: 16px; left: 16px; right: auto; width: auto; height: 44px; padding: 5px 10px; display: flex; gap: 16px; border-radius: 6px; }
+.compact-hud .brand-block { gap: 8px; }
+.compact-hud .brand-mark { width: 30px; height: 30px; }
+.compact-hud .brand-mark > svg { width: 20px; }
+.compact-hud .brand-block h1 { font-size: 17px; }
+.compact-hud .brand-block h1 > span, .compact-hud .brand-block p, .compact-hud .currency-label { display: none; }
+.compact-hud .header-actions { gap: 3px; }
+.compact-hud .wallet { gap: 6px; }
+.compact-hud .wallet strong { font-size: 13px; }
+.compact-hud .coin { height: 23px; width: 23px; }
+.compact-hud .coin svg { width: 13px; }
+.compact-hud .header-divider { height: 19px; margin: 0 5px; }
+.compact-hud .header-actions .icon-button { width: 32px; height: 32px; flex-basis: 32px; }
+.compact-hud .save-status { display: flex; width: 45px; font-size: 9px; }
+.compact-hud .mode-switch { position: absolute; top: 16px; right: 16px; left: auto; transform: none; height: 44px; padding: 5px; background: var(--paper-glass); box-shadow: var(--shadow); z-index: 5; }
+.compact-hud .mode-switch button { height: 34px; width: 65px; font-size: 11px; gap: 6px; }
+.compact-hud .location-label { top: 70px; left: 16px; padding: 8px 10px; font-size: 10px; }
+.compact-hud .world-weather, .compact-hud .map-peek, .compact-hud .resident-strip, .compact-hud .live-top-label, .compact-hud .world-meta { display: none; }
+.compact-hud .left-rail { left: 16px; top: 118px; }
+.compact-hud.mode-build .left-rail .tool-group:first-child { display: grid; grid-template-columns: repeat(2, 36px); gap: 2px; padding: 4px; }
+.compact-hud.mode-build .left-rail .tool-group:first-child .icon-button { width: 36px; height: 36px; }
+.compact-hud.mode-build .left-rail .tool-divider { display: none; }
+.compact-hud.mode-live .left-rail { display: none; }
+.compact-hud .camera-controls { left: 16px; right: auto; bottom: 196px; padding: 4px; gap: 1px; }
+.compact-hud .camera-controls .icon-button { width: 32px; height: 32px; flex-basis: 32px; }
+.compact-hud.mode-live .camera-controls { bottom: 16px; }
+.compact-hud.catalog-collapsed .camera-controls { bottom: 76px; }
+.compact-hud.catalog-collapsed.mode-live .camera-controls { bottom: 16px; }
+.compact-hud .catalog { height: 158px; left: 16px; right: 16px; bottom: 16px; }
+.compact-hud .catalog-header { height: 44px; }
+.compact-hud .catalog-body { height: 114px; padding-top: 8px; padding-bottom: 8px; }
+.compact-hud .catalog-items { height: 98px; }
+.compact-hud .catalog-item { flex-basis: 143px; }
+.compact-hud .catalog-item .furniture-preview, .compact-hud .catalog-item .preview-loading { height: 58px; }
+.compact-hud .catalog-item-info { padding-top: 2px; padding-bottom: 6px; gap: 3px; }
+.compact-hud .catalog-scroll-buttons { top: 24px; }
+.compact-hud .catalog.closed { height: 44px; }
+.compact-hud .inspector { display: none; top: 70px; right: 16px; width: 250px; max-height: calc(100dvh - 258px); }
+.compact-hud .inspector.is-open { display: block; z-index: 6; }
+.compact-hud .mobile-properties { position: absolute; z-index: 4; display: grid; place-items: center; top: 70px; right: 16px; width: 36px; height: 36px; background: var(--paper-glass); box-shadow: var(--shadow); }
+.compact-hud .inspector-header .mobile-close { display: inline-flex; }
+.compact-hud .inspector-header .section-eyebrow { flex: 1; }
+.compact-hud .placement-bar { top: 70px; bottom: auto; left: 50%; transform: translateX(-50%); }
+.compact-hud .avatar-editor { top: 70px; right: 16px; bottom: 16px; width: 286px; }
+.compact-hud .studio-label { top: 95px; left: 82px; }
+.compact-hud .studio-tools { left: 16px; }
+.compact-hud .toast, .compact-hud.mode-live .toast, .compact-hud.mode-avatar .toast { top: 72px; bottom: auto; left: 50%; max-width: calc(100% - 36px); font-size: 11px; }
+.compact-hud .interaction-menu { bottom: 98px; z-index: 8; }
+.camera-menu { position: relative; }
+.camera-menu summary { list-style: none; cursor: pointer; width: 32px; height: 32px; display: grid; place-items: center; }
+.camera-menu summary::-webkit-details-marker { display: none; }
+.camera-options { position: absolute; left: 0; bottom: 44px; display: grid; grid-template-columns: repeat(3, 36px); gap: 4px; padding: 8px; border-radius: 6px; }
+.camera-menu[open] summary { background: var(--leaf-light); color: var(--leaf); }
+.lot-actions { display: grid; gap: 12px; }
+.lot-actions > button { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.fishing-entry { position:absolute; left:16px; top:108px; z-index:4; display:flex; align-items:center; gap:8px; padding:10px; font-size:11px; color:var(--leaf); }
+.fishing-entry small { font-variant-numeric:tabular-nums; }
+.fishing-spots { padding:8px 24px; }
+.fishing-spots button { display:flex; align-items:center; gap:12px; width:100%; min-height:52px; border-bottom:1px solid var(--line); color:var(--leaf); }
+.fishing-spots button span { flex:1; text-align:left; }
+.catch-collection { padding:16px 24px 24px; }
+.catch-collection h3 { font-size:13px; margin-bottom:12px; display:flex; justify-content:space-between; }
+.catch-collection > div { display:flex; align-items:center; gap:12px; min-height:40px; font-size:12px; }
+.catch-collection strong { margin-left:auto; font-variant-numeric:tabular-nums; }
+.action-queue { padding:0 10px 6px; border-bottom:1px solid var(--line); }
+.queue-heading { display:flex; align-items:center; gap:6px; font-size:10px; color:var(--ink-secondary); }
+.queue-heading > span { flex:1; }
+.action-queue ol { list-style:none; margin:0; padding:0; max-height:104px; overflow-y:auto; }
+.action-queue li { display:flex; align-items:center; gap:5px; min-height:34px; font-size:10px; color:var(--ink-secondary); }
+.action-queue li > span { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.action-queue li small { display:block; font-size:9px; color:var(--ink-tertiary, #8c9a88); overflow:hidden; text-overflow:ellipsis; }
+.action-queue .hud-tool { width:25px; flex-basis:25px; height:28px; }
+.autonomy-setting { display: flex; align-items: center; justify-content: space-between; padding: 4px 13px 10px; font-size: 10px; color: var(--ink-secondary); }
+.autonomy-setting input { accent-color: var(--leaf); width: 16px; height: 16px; margin: 0; cursor: pointer; }
+
+.hud-tool { width: 30px; height: 30px; flex: 0 0 30px; display: inline-grid; place-items: center; border-radius: 4px; padding: 0; color: #7a8975; }
+.hud-tool:hover:not(:disabled) { background: var(--leaf-light); color: var(--leaf); }
+.resident-panel { position: absolute; z-index: 5; right: 16px; bottom: 16px; width: 260px; overflow: hidden; border-radius: 7px; }
+.resident-panel-heading { padding: 10px 10px 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.resident-panel .resident { flex: 1; min-width: 0; gap: 9px; }
+.resident-panel .resident .avatar-portrait { width: 44px; height: 46px; border-width: 2px; }
+.resident-panel .resident strong { font-size: 13px; line-height: 1.4; }
+.resident-panel .resident small { font-size: 10px; margin-top: 3px; }
+.resident-panel .resident > span { min-width: 0; overflow: hidden; }
+.resident-panel .resident strong { display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.resident-panel-content { height: 128px; padding: 10px 13px; }
+.resident-panel .needs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+.resident-panel .need > div { font-size: 10px; gap: 5px; }
+.resident-panel .need strong { font-size: 10px; }
+.resident-panel .need meter { margin-top: 6px; height: 5px; }
+.resident-tabs { display: flex; border-top: 1px solid var(--line); padding: 3px 8px; gap: 3px; }
+.resident-tabs > button { flex: 1; display: flex; justify-content: center; align-items: center; gap: 6px; min-height: 32px; font-size: 10px; border-radius: 4px; color: #8b987e; }
+.resident-tabs > button[aria-selected="true"] { color: var(--leaf); background: var(--leaf-light); }
+.hud-activity { display: flex; align-items: center; gap: 6px; margin: 0 10px 0 14px; color: #7b8d6e; min-height: 28px; font-size: 10px; }
+.hud-activity > span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.resident-panel .activity-progress { margin: 5px 13px 7px; height: 3px; }
+.hud-traits { display: flex; flex-wrap: wrap; gap: 10px 14px; font-size: 11px; color: #7c8f6c; }
+.hud-traits > span, .hud-traits button { display: flex; align-items: center; gap: 5px; }
+.hud-traits button { width: 100%; padding: 2px 0; font-size: 10px; color: #91a182; }
+.hud-neighbors > div { display: flex; align-items: center; gap: 6px; height: 24px; font-size: 10px; color: var(--ink-secondary); }
+.hud-neighbors small { margin-left: auto; font-size: 9px; color: #a1ab96; }
+.hud-neighbors .hud-tool { width: 25px; height: 24px; flex-basis: 25px; }
+.status-dot.busy { background: #c3a565; }
+.time-controls { position: absolute; z-index: 5; left: 50%; bottom: 16px; transform: translateX(-50%); width: 214px; padding: 7px 12px 5px; border-radius: 6px; }
+.time-reading { display: flex; align-items: center; justify-content: center; gap: 7px; }
+.time-reading svg { color: #b39b67; }
+.time-reading strong { font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.time-reading > span { font-size: 9px; color: #95a088; margin-left: 2px; }
+.time-playback { display: flex; align-items: center; justify-content: center; gap: 3px; margin-top: 3px; }
+.time-playback > button { height: 28px; width: 34px; border-radius: 4px; font-size: 11px; color: #8f9b80; }
+.time-playback > button.active { background: #e7edde; color: #547a59; }
+.time-playback .hud-tool[aria-pressed="true"] { background: #f1e4d9; color: #a67f65; }
+.time-playback small { font-size: 8px; margin-left: 2px; }
+
+@media (max-width: 900px) {
+  .resident-panel { width: 224px; }
+  .time-controls { width: 185px; }
+  .compact-hud.mode-live .camera-controls .icon-button { width: 29px; flex-basis: 29px; }
+}
+
+@media (max-width: 760px) {
+  .fishing-entry { left:12px; top:101px; padding:8px; }
+  .action-queue { padding:0 6px 4px; }
+  .action-queue ol { max-height:76px; }
+  .compact-hud .game-header { top: 12px; left: 12px; height: 40px; gap: 4px; padding: 4px 8px; }
+  .compact-hud .header-actions { display: flex; grid-column: auto; grid-row: auto; }
+  .compact-hud .wallet, .compact-hud .header-divider, .compact-hud .save-status { display: none; }
+  .compact-hud .brand-block h1 { font-size: 16px; }
+  .compact-hud .mode-switch { top: 12px; right: 12px; width: auto; height: 40px; padding: 4px; gap: 2px; }
+  .compact-hud .mode-switch button { width: 33px; height: 32px; flex: 0 0 33px; padding: 0; }
+  .compact-hud .mode-switch button > span { display: none; }
+  .compact-hud .mode-switch button svg { width: 17px; height: 17px; }
+  .compact-hud .location-label { top: 62px; left: 12px; padding: 7px 9px; font-size: 9px; }
+  .compact-hud .left-rail { left: 12px; top: 106px; }
+  .compact-hud .camera-controls { left: 12px; right: auto; bottom: 202px; max-width: calc(100% - 24px); }
+  .compact-hud.mode-live .camera-controls { bottom: 93px; flex-direction: column; width: 37px; }
+  .compact-hud.mode-live .camera-controls .tool-divider { width: 20px; height: 1px; margin: 3px 0; }
+  .compact-hud.mode-live .camera-controls .icon-button { width: 29px; height: 29px; flex-basis: 29px; }
+  .compact-hud.mode-live .camera-controls .icon-button { display: inline-grid; }
+  .compact-hud.mode-live .camera-options { left: 44px; bottom: 0; }
+  .compact-hud.mode-build .camera-options { left: auto; right: 0; }
+  .compact-hud.catalog-collapsed .camera-controls { bottom: 81px; }
+  .compact-hud.catalog-collapsed.mode-live .camera-controls { bottom: 93px; }
+  .compact-hud .catalog { left: 12px; right: 12px; bottom: 12px; height: 174px; }
+  .compact-hud .catalog-header { height: 64px; grid-template-rows: 32px 30px; }
+  .compact-hud .catalog-body { height: 110px; }
+  .compact-hud .catalog-item { flex-basis: 115px; }
+  .compact-hud .catalog.closed { height: 36px; }
+  .compact-hud .mobile-properties { top: 62px; right: 12px; }
+  .compact-hud .inspector { top: 103px; right: 12px; width: min(253px, calc(100% - 75px)); max-height: calc(100dvh - 370px); }
+  .compact-hud .placement-bar { top: 106px; bottom: auto; }
+  .compact-hud .avatar-editor { top: auto; left: 12px; right: 12px; width: auto; bottom: 12px; height: 42dvh; min-height: 270px; }
+  .compact-hud .studio-label { left: 16px; top: 70px; }
+  .compact-hud .studio-tools { left: auto; top: 88px; right: 12px; }
+  .compact-hud .toast, .compact-hud.mode-live .toast, .compact-hud.mode-avatar .toast { top: 64px; bottom: auto; font-size: 10px; }
+  .compact-hud .interaction-menu { bottom: 185px; }
+  .resident-panel { right: 12px; bottom: 88px; width: 192px; }
+  .resident-panel.is-collapsed { width: 166px; }
+  .resident-panel-heading { padding: 8px; }
+  .resident-panel .resident { gap: 7px; }
+  .resident-panel .resident .avatar-portrait { width: 36px; height: 38px; }
+  .resident-panel .resident strong { font-size: 11px; }
+  .resident-panel .resident small { font-size: 9px; }
+  .resident-panel-content { height: 122px; padding: 8px 10px; }
+  .resident-panel .needs { gap: 12px 10px; border: none; padding: 0; }
+  .resident-panel .need > div { font-size: 9px; gap: 3px; }
+  .resident-panel .need > div strong { font-size: 9px; }
+  .resident-tabs { padding: 3px 5px; }
+  .resident-tabs > button { gap: 4px; font-size: 9px; min-height: 29px; }
+  .resident-tabs svg { width: 13px; height: 13px; }
+  .hud-activity { font-size: 9px; margin: 0 6px 0 10px; gap: 4px; }
+  .hud-activity .hud-tool { width: 25px; flex-basis: 25px; }
+  .hud-traits { font-size: 10px; gap: 10px 8px; }
+  .time-controls { bottom: 12px; width: 192px; padding: 6px 9px 4px; }
+  .time-reading strong { font-size: 16px; }
+  .time-playback > button { height: 26px; width: 32px; }
+}
