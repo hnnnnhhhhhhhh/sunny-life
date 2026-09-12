@@ -31,6 +31,8 @@ export function createOcean() {
     name: 'CoastalWater',
     uniforms: { color: { value: new THREE.Color('#277e98') }, tDiffuse: { value: null },
       textureMatrix: { value: new THREE.Matrix4() }, uTime: { value: 0 }, uShore: { value: null },
+      uHorizon: { value: new THREE.Color('#c4d7d3').convertLinearToSRGB() },
+      uHazeRange: { value: new THREE.Vector2(65,190) },
       uEye: { value: new THREE.Vector3() }, uView: { value: new THREE.Vector3() }, uOrtho: { value: 1 } },
     vertexShader: `
       uniform mat4 textureMatrix;
@@ -49,6 +51,8 @@ export function createOcean() {
       uniform vec3 uEye;
       uniform vec3 uView;
       uniform float uOrtho;
+      uniform vec3 uHorizon;
+      uniform vec2 uHazeRange;
       varying vec4 vMirror;
       varying vec3 vWorld;
       float heightAt(vec2 p) {
@@ -81,10 +85,13 @@ export function createOcean() {
         gl_FragColor = vec4(water,alpha + foam*0.2);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
+        float haze = smoothstep(uHazeRange.x,uHazeRange.y,length(p-uEye.xz));
+        gl_FragColor.rgb = mix(gl_FragColor.rgb,uHorizon,haze);
+        gl_FragColor.a = mix(gl_FragColor.a,1.0,haze);
       }
     `,
   };
-  const mesh = new Reflector(new THREE.PlaneGeometry(240, 240), {
+  const mesh = new Reflector(new THREE.PlaneGeometry(4000, 4000), {
     shader, textureWidth: 512, textureHeight: 512, multisample: 0, clipBias: 0.003,
   });
   mesh.name = 'CoastalOcean';
@@ -138,7 +145,7 @@ export function createOcean() {
     },
     update(time) { mesh.material.uniforms.uTime.value = time * 0.001; },
     time() { return mesh.material.uniforms.uTime.value; },
-    diagnostics() { return { reflectedFrames, style: 'shallow-reflective', shoreResolution: 256, lowQuality }; },
+    diagnostics() { return { reflectedFrames, style: 'shallow-reflective', shoreResolution: 256, lowQuality, horizonHaze:[65,190], extent:4000 }; },
     dispose() { mesh.dispose(); mesh.geometry.dispose(); shore.dispose(); },
   };
 }

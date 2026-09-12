@@ -2,9 +2,9 @@
   "generator": "Blender 4.5.3 LTS",
   "file": "models/resident/resident.glb",
   "source": "art/blender/sunny-resident.blend",
-  "bytes": 4406296,
-  "sha256": "60e70e98cc6f7ea9e8094a5826cfc5041db4e000d3abca33f6b4549513f73b4b",
-  "height": 2.25,
+  "bytes": 4430412,
+  "sha256": "30c5523b386cad6bf5faac936457e7163dfdce8ad8a2fe838b88e77e5e74ebc8",
+  "height": 2.21,
   "hipHeight": 1.08,
   "animations": [
     "Idle",

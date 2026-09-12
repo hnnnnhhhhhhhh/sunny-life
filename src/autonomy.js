@@ -1,14 +1,14 @@
 import { ACTIVITIES, ITEM_MAP } from './game.js';
 import { planActivity, planChat } from './interactions.js';
 
-const THRESHOLDS = { hunger: 48, energy: 38, bladder: 45, hygiene: 40, social: 35, fun: 35 };
+const THRESHOLDS = { hunger: 48, energy: 38, bladder: 45, hygiene: 70, social: 35, fun: 35 };
 const PRIORITIES = { hunger: 1.2, energy: 1.1, bladder: 1.5, hygiene: 1, social: 0.7, fun: 0.65 };
 
 export function autonomousCandidates(game, from, grid, neighbors = []) {
   const candidates = [];
   for (const object of game.home.furniture) {
     const type = ITEM_MAP[object.type].activity, definition = ACTIVITIES[type];
-    if (!definition || game.sim.needs[definition.need] >= THRESHOLDS[definition.need]) continue;
+    if (!definition || type==='washHands' || game.sim.needs[definition.need] >= THRESHOLDS[definition.need]) continue;
     const plan = planActivity(game.home, object, from, grid, game.avatar.height);
     if (plan.error) continue;
     candidates.push({ id: object.id, type, plan, score: (100 - game.sim.needs[definition.need]) * PRIORITIES[definition.need] +

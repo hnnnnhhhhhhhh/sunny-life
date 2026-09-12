@@ -15,16 +15,18 @@ export const CATALOG = [
   { type: 'bed', name: '好梦双人床', category: 'bedroom', price: 1850, width: 2.25, depth: 2.9, color: '#b1b998', colors: ['#b1b998', '#c8a49b', '#a3b6c2', '#e3cfb2'], detail: '棉质床品 · 软包床头', activity: 'sleep' },
   { type: 'nightstand', name: '床边小方柜', category: 'bedroom', price: 260, width: 0.65, depth: 0.6, color: '#c09970', colors: ['#c09970', '#eee4d2', '#7c6b58'], detail: '双层收纳 · 实木拉手' },
   { type: 'desk', name: '灵感书桌', category: 'bedroom', price: 780, width: 1.8, depth: 1.5, color: '#c6aa82', colors: ['#c6aa82', '#e8e1d2', '#96745b'], detail: '宽阔桌面 · 配套座椅', activity: 'read' },
-  { type: 'kitchen', name: '晨光整体厨房', category: 'kitchen', price: 2400, width: 3.9, depth: 0.95, color: '#a9b8aa', colors: ['#a9b8aa', '#d6cab1', '#8ca4aa'], detail: '石材台面 · 嵌入式灶台', activity: 'eat' },
+  { type: 'kitchen', name: '晨光整体厨房', category: 'kitchen', price: 2400, width: 3.9, depth: 0.95, color: '#a9b8aa', colors: ['#a9b8aa', '#d6cab1', '#8ca4aa'], detail: '石材台面 · 嵌入式灶台', activity: 'eat', activities:['eat','washHands'] },
   { type: 'dining', name: '两个人的餐桌', category: 'kitchen', price: 960, width: 1.9, depth: 1.9, color: '#cca476', colors: ['#cca476', '#e3d7bf', '#906d53'], detail: '圆角餐桌 · 一桌两椅', activity: 'eat' },
   { type: 'fridge', name: '复古小冰箱', category: 'kitchen', price: 1200, width: 0.9, depth: 0.85, color: '#d4dfcf', colors: ['#d4dfcf', '#e4c0a5', '#99b9c2'], detail: '双门冷藏 · 复古圆角', activity: 'eat' },
   { type: 'bench', name: '花园长椅', category: 'outdoor', price: 380, width: 1.9, depth: 0.7, color: '#be9971', colors: ['#be9971', '#e0daca', '#7c998e'], detail: '户外实木 · 铸铁椅脚', activity: 'rest' },
   { type: 'planter', name: '小小花圃', category: 'outdoor', price: 240, width: 1.4, depth: 0.7, color: '#b48261', colors: ['#b48261', '#e6d5b4', '#7d9386'], detail: '木质花箱 · 四季花卉', activity: 'garden' },
   { type: 'toilet', name: '净白坐便器', category: 'bathroom', price: 520, width: 0.8, depth: 1.15, color: '#edf1ed', colors: ['#edf1ed', '#b2cac6', '#c9c5d5'], detail: '陶瓷坐便 · 节水水箱', activity: 'toilet' },
   { type: 'shower', name: '晨雾淋浴间', category: 'bathroom', price: 980, width: 1.4, depth: 1.4, color: '#b2cac6', colors: ['#b2cac6', '#edf1ed', '#c9c5d5'], detail: '磨砂围挡 · 顶置花洒', activity: 'shower' },
+  { type: 'sink', name: '清泉洗手台', category: 'bathroom', price: 460, width: 1.1, depth: 0.8, color: '#bfd0c8', colors:['#bfd0c8','#edf1ed','#b0bccb'], detail:'陶瓷水盆 · 感应排水', activity:'washHands' },
 ];
 
 export const ITEM_MAP = Object.fromEntries(CATALOG.map(item => [item.type, item]));
+export const activityTypes = type => ITEM_MAP[type]?.activities || (ITEM_MAP[type]?.activity ? [ITEM_MAP[type].activity] : []);
 export const FLOOR_STYLES = [
   { id: 'oak', name: '浅橡木', color: '#c9ab80' },
   { id: 'birch', name: '白桦木', color: '#e1d4b5' },
@@ -47,10 +49,24 @@ export const ACTIVITIES = {
   toilet: { label: '上厕所', status: '正在如厕', need: 'bladder', amount: 72 },
   shower: { label: '洗澡', status: '正在淋浴', need: 'hygiene', amount: 65 },
   fish: { label: '钓鱼', status: '静待鱼儿上钩', need: 'fun', amount: 24 },
+  washHands: { label:'洗手', status:'正在洗手', need:'hygiene', amount:3 },
 };
 
 export const NEED_DEFAULTS = { hunger: 78, energy: 86, social: 68, fun: 92, hygiene: 82, bladder: 85 };
-export const NEED_DECAY = { hunger: 0.13, energy: 0.085, social: 0.065, fun: 0.09, hygiene: 0.032, bladder: 0.17 };
+export const GAME_MINUTES_PER_SECOND = 0.5;
+export const NEED_DECAY = Object.freeze({
+  hunger: 50 / (5 * 60), energy: 60 / (16 * 60),
+  social: 35 / (24 * 60), fun: 40 / (12 * 60),
+  hygiene: 30 / (24 * 60), bladder: 65 / (8 * 60),
+});
+
+export function advanceSim(sim, minutes) {
+  if (!Number.isFinite(minutes) || minutes <= 0) return sim;
+  const time = sim.time + minutes;
+  const needs = Object.fromEntries(Object.entries(sim.needs).map(([key,value]) =>
+    [key, Math.max(0, value - (NEED_DECAY[key] || 0) * minutes)]));
+  return { ...sim, time: time % 1440, day: Math.min(99999, sim.day + Math.floor(time / 1440)), needs };
+}
 
 export const DEFAULT_AVATAR = {
   name: '林小满', skin: SKIN_COLORS[1], hairColor: HAIR_COLORS[0], hair: 'bob',

@@ -47,7 +47,7 @@ test('eating moves a rigged hand to the food and mouth, pauses, and ends standin
   await boot(page);
   await order(page);
   const initial = await page.evaluate(() => window.__sunny.diagnostics());
-  expect(initial.resident.bones).toBe(25);
+  expect(initial.resident.bones).toBe(29);
   expect(initial.mealVisible).toBe(true);
   await page.waitForTimeout(1100);
   const moving = await page.evaluate(() => window.__sunny.diagnostics());

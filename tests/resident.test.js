@@ -57,7 +57,8 @@ test('the Blender resident has a real skin, skeleton, clothing and changing anim
     if (node.isSkinnedMesh) skinned = node;
     if (node.userData.variant) variants.add(node.userData.variant);
   });
-  assert.equal(skinned.skeleton.bones.length, 25);
+  assert.equal(skinned.skeleton.bones.length, 29);
+  for(const name of ['Palm_L','Palm_R','WashTarget_L','WashTarget_R'])assert.ok(skinned.skeleton.bones.some(b=>b.name===name));
   for (const name of ['shirt', 'jacket', 'cardigan', 'hair:bob', 'hair:short', 'hair:bun', 'hair:curly']) assert.ok(variants.has(name), name);
   gltf.scene.updateMatrixWorld(true);
   for (const base of ['female', 'male']) {
@@ -69,7 +70,7 @@ test('the Blender resident has a real skin, skeleton, clothing and changing anim
       for (let i = 0; i < position.count; i++) {
         const p = node.localToWorld(new Vector3().fromBufferAttribute(position, i));
         lowest = Math.min(lowest, p.y);
-        if (p.y > 1.70 && p.y < 1.8) { neckWidth = Math.max(neckWidth, Math.abs(p.x)); vertices++; }
+        if (p.y > 1.70 && p.y < 1.76) { neckWidth = Math.max(neckWidth, Math.abs(p.x)); vertices++; }
       }
     });
     assert.ok(vertices > 20);

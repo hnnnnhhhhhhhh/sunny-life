@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Vector3 } from 'three';
+import layout from '../src/resident-layout.json' with {type:'json'};
 
 const resident = (async () => {
   const bytes = await readFile(new URL('../public/models/resident/resident.glb', import.meta.url));
@@ -53,7 +54,9 @@ test('narrower arm pivots retain head, hip and foot height references',async()=>
   assert.ok(Math.abs(point('UpperArm_R').y-1.635)<1e-5);
   assert.ok(Math.abs(point('Hand_R').x-0.278)<1e-5);
   assert.ok(Math.abs(point('Hips').y-1.08)<1e-5);
-  assert.ok(Math.abs(point('Head').y-1.81)<1e-5);
+  assert.ok(Math.abs(point('Head').y-layout.headBase)<1e-5);
+  assert.ok(Math.abs(point('Head').z-layout.headForward)<1e-5);
+  assert.ok(Math.abs(point('Mouth').y-layout.mouthHeight)<1e-5);
   assert.ok(Math.abs(point('Foot_R').y-0.09)<1e-5);
 });
 

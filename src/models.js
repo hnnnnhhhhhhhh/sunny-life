@@ -5,6 +5,7 @@ import { createBlenderFurniture } from './model-assets.js';
 import { allWalls, floorRegions, HOUSE_FLOOR, HOUSE_WINDOW as WINDOW, WALL_HEIGHT, wallAxis, wallOpenings, wallParts } from './architecture.js';
 import { createResidentModel } from './characters.js';
 import { createTelevision } from './activity-props.js';
+import { SINK_LAYOUT, sinkCenter } from './handwashing.js';
 
 const geometries = new Map(), materials = new Map();
 const geometry = (key, create) => {
@@ -71,6 +72,34 @@ function vase(g, x, y, z) {
     stem.rotation.z = -i * 0.15;
     sphere(g, x + i * 0.07, y + 0.65 + (i % 2) * 0.06, z, 0.08, 0.11, 0.055, '#dfc69f', true);
   }
+}
+
+function sinkBasin(g, center, width, depth) {
+  const ceramic = '#edf2ef', metal = '#aabfc1';
+  const left = -width / 2, right = width / 2;
+  for (const [a,b] of [[left,center-.375],[center+.375,right]]) {
+    box(g,(a+b)/2,.97,0,b-a,.10,depth,ceramic,.018);
+  }
+  for (const side of [-1,1]) {
+    box(g,center,.97,side*(depth/2+.31)/2,.75,.10,depth/2-.31,ceramic,.012);
+    box(g,center+side*.35,.925,0,.05,.20,.62,ceramic,.02);
+    box(g,center,.925,side*.285,.67,.20,.05,ceramic,.02);
+  }
+  box(g,center,.835,0,.69,.04,.56,'#c1d1cf',.025).name='SinkBottom';
+  cylinder(g,center,.86,0,.045,.045,.009,metal,12);
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(center,1.015,-.36),new THREE.Vector3(center,1.37,-.34),
+    new THREE.Vector3(center,1.43,-.08),new THREE.Vector3(center,SINK_LAYOUT.waterY,SINK_LAYOUT.waterZ),
+  ]);
+  const faucet = add(g,new THREE.TubeGeometry(curve,16,.025,8,false),metal,0,0,0,{metalness:.65,roughness:.25});
+  faucet.userData.disposable=true; faucet.name='Faucet';
+  const handle=new THREE.Group();
+  handle.name='TapHandle';handle.position.set(center+SINK_LAYOUT.handleX,SINK_LAYOUT.handleY,SINK_LAYOUT.handleZ);
+  g.add(handle);box(handle,0,.025,0,.025,.085,.075,metal,.01);
+  cylinder(g,center+SINK_LAYOUT.handleX,1.06,SINK_LAYOUT.handleZ,.036,.04,.08,metal,10);
+  cylinder(g,center+SINK_LAYOUT.soapX,1.105,SINK_LAYOUT.soapZ,.055,.065,.17,'#86b6ac',10);
+  const pump=box(g,center+SINK_LAYOUT.soapX,SINK_LAYOUT.soapY,SINK_LAYOUT.soapZ,.075,.035,.095,ceramic,.012);
+  pump.name='SoapPump';
 }
 
 export function furnitureModel(type, color) {
@@ -187,18 +216,13 @@ export function furnitureModel(type, color) {
     chair.position.z = 0.49;
     g.add(chair);
   } else if (type === 'kitchen') {
-    box(g, 0, 0.49, 0, 3.9, 0.89, 0.89, color, 0.03);
-    box(g, 0, 0.96, 0, 4, 0.11, 0.98, '#ece6d7', 0.025);
+    box(g, 0, 0.415, 0, 3.9, 0.75, 0.89, color, 0.03);
+    sinkBasin(g,sinkCenter(type),4,.98);
     for (let i = 0; i < 6; i++) {
       const x = (i - 2.5) * 0.64;
       box(g, x, 0.51, 0.455, 0.6, 0.76, 0.022, color, 0.015);
       box(g, x, 0.75, 0.481, 0.21, 0.025, 0.035, '#ad956c', 0.009);
     }
-    box(g, -1.13, 1.024, 0, 0.75, 0.014, 0.62, '#7e8e86', 0.075);
-    box(g, -1.13, 1.035, 0, 0.59, 0.01, 0.47, '#a8b5ad', 0.065);
-    cylinder(g, -1.13, 1.2, -0.34, 0.025, 0.025, 0.35, '#c3b798');
-    const tap = cylinder(g, -1.13, 1.35, -0.25, 0.026, 0.026, 0.21, '#c3b798');
-    tap.rotation.x = Math.PI / 2;
     box(g, 0.53, 1.024, 0, 1, 0.025, 0.64, '#46524b', 0.02);
     for (const x of [0.28, 0.78]) for (const z of [-0.16, 0.16]) cylinder(g, x, 1.044, z, 0.11, 0.11, 0.008, '#809087');
     cylinder(g, 0.78, 1.15, 0.16, 0.14, 0.14, 0.22, '#c6b48f');
@@ -226,6 +250,14 @@ export function furnitureModel(type, color) {
     box(g, 0, 0.59, 0.44, 0.86, 1.11, 0.075, color, 0.045);
     box(g, -0.3, 1.55, 0.51, 0.045, 0.28, 0.065, '#b4b4a2', 0.02);
     box(g, -0.3, 0.91, 0.51, 0.045, 0.29, 0.065, '#b4b4a2', 0.02);
+  } else if (type === 'sink') {
+    legs(g,.82,.52,.15,'#758d88');
+    box(g,0,.465,0,1.04,.66,.74,color,.035);
+    for(const x of [-.255,.255]) {
+      box(g,x,.5,.381,.49,.53,.025,color,.015);
+      box(g,x,.68,.408,.16,.022,.025,'#aabfc1',.008);
+    }
+    sinkBasin(g,0,1.1,.8);
   } else if (type === 'toilet') {
     box(g, 0, 0.18, 0, 0.42, 0.36, 0.69, color, 0.12);
     sphere(g, 0, 0.42, 0.1, 0.36, 0.19, 0.43, color);

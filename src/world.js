@@ -9,6 +9,7 @@ import { layout, terrainHeight, terrainSurface } from './terrain.js';
 import { ActivityRunner } from './activity-runner.js';
 import { Autonomy } from './autonomy.js';
 import { ActionQueue } from './action-queue.js';
+import residentLayout from './resident-layout.json' with { type:'json' };
 
 export class World {
   constructor(container, emit) {
@@ -30,7 +31,7 @@ export class World {
     this.queue = new ActionQueue(this);
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#c4d7d3');
-    this.scene.fog = new THREE.Fog('#c4d7d3', 80, 155);
+    this.scene.fog = new THREE.Fog('#c4d7d3', 65, 190);
     const lowQuality=new URLSearchParams(window.location.search).get('quality')==='low' || navigator.hardwareConcurrency<=4;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(lowQuality?0.5:Math.min(window.devicePixelRatio, 1.75));
@@ -42,7 +43,7 @@ export class World {
     this.renderer.domElement.setAttribute('aria-label', '晴屿三维世界');
     this.renderer.domElement.setAttribute('data-testid', 'world-canvas');
     container.appendChild(this.renderer.domElement);
-    this.camera = new THREE.OrthographicCamera(-20, 20, 16, -16, 0.1, 180);
+    this.camera = new THREE.OrthographicCamera(-20, 20, 16, -16, 0.1, 1500);
     this.camera.position.set(21, 26, 30);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.target.set(1.4, 0, 0);
@@ -425,8 +426,8 @@ export class World {
     return true;
   }
 
-  startActivity(id, recipe) {
-    return this.queue.add({ kind:'furniture',targetId:id,recipe });
+  startActivity(id, recipe, activity) {
+    return this.queue.add({ kind:'furniture',targetId:id,recipe,activity });
   }
 
   startChat(id) {
@@ -463,8 +464,8 @@ export class World {
       const old = this.camera, distance = old.position.distanceTo(this.controls.target);
       const span = old.isOrthographicCamera ? old.top - old.bottom : 2 * Math.tan(THREE.MathUtils.degToRad(old.fov / 2)) * distance;
       const camera = old.isOrthographicCamera
-        ? new THREE.PerspectiveCamera(THREE.MathUtils.radToDeg(2 * Math.atan(span / (2 * distance))), this.width / this.height, 0.1, 180)
-        : new THREE.OrthographicCamera(-20, 20, 16, -16, 0.1, 180);
+        ? new THREE.PerspectiveCamera(THREE.MathUtils.radToDeg(2 * Math.atan(span / (2 * distance))), this.width / this.height, 0.1, 1500)
+        : new THREE.OrthographicCamera(-20, 20, 16, -16, 0.1, 1500);
       camera.position.copy(old.position); camera.quaternion.copy(old.quaternion); camera.zoom = old.zoom;
       this.camera = camera; this.controls.object = camera; this.cameraTransition = null;
       this.updateProjection(); this.controls.update();
@@ -493,7 +494,7 @@ export class World {
       this.cameraTransition = { position: target.clone().add(new THREE.Vector3(21, 26, 30)), target, zoom: 1.25 };
     } else if (action === 'portrait') {
       const height = this.state.draft.height;
-      const target = new THREE.Vector3(0, 1.975 * height, 0.035);
+      const target = new THREE.Vector3(0, residentLayout.eyeHeight * height, 0.035 + residentLayout.headForward);
       this.cameraTransition = { position: target.clone().add(new THREE.Vector3(1.1, 0.21, 6)), target, zoom: Math.min(3.5, 3 / height) };
     } else if (action === 'fullBody') {
       this.cameraTransition = { position: new THREE.Vector3(3.2, 2.65, 7), target: new THREE.Vector3(0, 1.2, 0), zoom: 1 };
@@ -628,10 +629,12 @@ export class World {
       previewSource: this.preview?.userData.source || null,
       environment: { landmarks: this.environmentSystem.assets, waterTime: this.environmentSystem.waterTime(), waterSamples, grass: this.environmentSystem.grass.diagnostics(), ocean:this.environmentSystem.ocean.diagnostics() },
       resident: this.player?.userData.controller?.diagnostics() || null,
-      activity: this.activities.current ? { type: this.activities.current.type, stage: this.activities.current.stage, progress: this.activities.current.progress, recipe: this.activities.current.recipe, targetId: this.activities.current.targetId, seatId: this.activities.current.seatId, npcId: this.activities.current.npcId, seat: this.activities.current.seat, seatTop: this.activities.current.seatTop, pillow: this.activities.current.pillow, floor: this.activities.current.floor } : null,
+      activity: this.activities.current ? { type: this.activities.current.type, stage: this.activities.current.stage, progress: this.activities.current.progress, recipe: this.activities.current.recipe, targetId: this.activities.current.targetId, seatId: this.activities.current.seatId, npcId: this.activities.current.npcId, seat: this.activities.current.seat, seatTop: this.activities.current.seatTop, pillow: this.activities.current.pillow, floor: this.activities.current.floor,
+        bedTime:this.activities.current.bedTime,bedPose:this.activities.current.bedPose,stand:this.activities.current.stand } : null,
       mealVisible: !!this.activities.meal,
       coverVisible: !!this.activities.cover,
       bathroom: this.activities.bathroom?.diagnostics() || null,
+      handwashing: this.activities.handwashing?.diagnostics() || null,
       fishing: this.activities.fishing?.diagnostics() || null,
       queue: this.queue.items.map(item=>({id:item.id,kind:item.kind,targetId:item.targetId,label:item.label})),
       autonomy: { enabled: this.state.game.sim.autonomy, blocked: this.autonomy.blocked, cooldown: this.autonomy.cooldown, active: !!this.activities.current?.autonomous },

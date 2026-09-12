@@ -1,0 +1,12 @@
+{
+  "headShift": -0.04,
+  "headForward": 0.018,
+  "headBase": 1.77,
+  "eyeHeight": 1.935,
+  "mouthHeight": 1.855,
+  "hipHeight": 1.08,
+  "upperLeg": 0.5,
+  "lowerLeg": 0.49,
+  "ankleHeight": 0.09,
+  "seatedPelvisPadding": 0.07
+}

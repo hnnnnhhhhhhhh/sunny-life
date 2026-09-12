@@ -7,12 +7,12 @@ import {
   Palette, Pause, Play, Plus, Redo2, RotateCw, Save, Scissors,
   Search, Settings2, Shirt, Shuffle, Smile, Sofa, Sparkles, Sprout, Sun,
   Trash2, Undo2, Utensils, UtensilsCrossed, X, Zap, ZoomIn, ZoomOut,
-  Bath, Camera, ChevronUp, DoorOpen, Scan, Square, RotateCcw, Toilet, ShowerHead, Box as BoxIcon, Fish, FishSymbol, Gauge,
+  Bath, Camera, ChevronUp, DoorOpen, Scan, Square, RotateCcw, Toilet, ShowerHead, Box as BoxIcon, Fish, FishSymbol, Gauge, Droplets,
 } from 'lucide-react';
 import {
   ACTIVITIES, CATALOG, CLOTHES_COLORS, FLOOR_STYLES, HAIR_COLORS,
-  ITEM_MAP, SKIN_COLORS, TRAITS, WALL_COLORS, loadGame, newGame, saveGame, uid,
-  validatePlacement, validateResize, validateSave, validateWall, createRoom, bathroomAddition, migrateGame, NEED_DECAY,
+  ITEM_MAP, activityTypes, SKIN_COLORS, TRAITS, WALL_COLORS, loadGame, newGame, saveGame, uid,
+  validatePlacement, validateResize, validateSave, validateWall, createRoom, bathroomAddition, migrateGame, advanceSim, GAME_MINUTES_PER_SECOND,
 } from './game.js';
 import { allWalls, floorRegions, removeWall, setWallOpening, wallParts } from './architecture.js';
 import { avatarModel, furnitureModel, modelPreview } from './models.js';
@@ -72,11 +72,7 @@ function reducer(state, action) {
   if (action.type === 'fishCaught') return { ...state,game:{...state.game,sim:{...state.game.sim,
     catches:[...state.game.sim.catches.slice(-199),{type:action.fish.id,day:state.game.sim.day}]}} };
   if (action.type === 'tick') {
-    const { sim } = state.game;
-    const time = sim.time + action.speed;
-    const nextNeeds = { ...sim.needs };
-    for (const key of Object.keys(nextNeeds)) nextNeeds[key] = Math.max(0, nextNeeds[key] - (NEED_DECAY[key] || 0.035) * action.speed);
-    return { ...state, game: { ...state.game, sim: { ...sim, time: time % 1440, day: Math.min(99999, sim.day + Math.floor(time / 1440)), needs: nextNeeds } } };
+    return { ...state, game: { ...state.game, sim: advanceSim(state.game.sim, GAME_MINUTES_PER_SECOND * action.speed) } };
   }
   if (action.type === 'avatar') return { ...state, game: { ...state.game, onboarding:true, avatar: action.value } };
   if (action.type === 'load') return { game: action.value, past: [], future: [], loadVersion: state.loadVersion + 1 };
@@ -553,6 +549,7 @@ export default function App({ modelWarning = false }) {
         <div className="meal-menu-heading"><UtensilsCrossed size={17} /><span>{ITEM_MAP[interaction.type].name}</span><IconButton icon={X} label="关闭家具互动" onClick={() => setInteraction(null)} /></div>
         <div className="segmented" aria-label="餐点选择">{Object.entries(MEALS).map(([id, meal]) => <button key={id} aria-pressed={selectedMeal === id} className={selectedMeal === id ? 'active' : ''} onClick={() => setSelectedMeal(id)}>{meal.name}</button>)}</div>
         <button className="primary-button" onClick={() => world.current?.startActivity(interaction.id, selectedMeal)}><Play size={14} />开始用餐<span>饱腹 +{MEALS[selectedMeal].amount}</span></button>
+        {activityTypes(interaction.type).includes('washHands') && <button className="secondary-button" onClick={() => world.current?.startActivity(interaction.id, undefined, 'washHands')}><Droplets size={15} />洗手</button>}
       </div> : <div className="interaction-menu surface" style={menuStyle}><span>{ITEM_MAP[interaction.type].name}</span><button className="primary-button" onClick={() => world.current?.startActivity(interaction.id)}><Play size={14} />{ACTIVITIES[ITEM_MAP[interaction.type].activity].label}</button><IconButton icon={X} label="关闭家具互动" onClick={() => setInteraction(null)} /></div>)}
     </>}
 

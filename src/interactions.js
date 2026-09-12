@@ -1,6 +1,9 @@
-import { findPath, footprint, ITEM_MAP, rectanglesOverlap, surfaceHeight } from './game.js';
+import { findPath, footprint, ITEM_MAP, activityTypes, rectanglesOverlap, surfaceHeight } from './game.js';
 import { wallColliders } from './architecture.js';
 import { WORLD_COLLIDERS } from './terrain.js';
+import residentLayout from './resident-layout.json' with { type:'json' };
+import { SINK_LAYOUT, sinkCenter } from './handwashing.js';
+import { bedSeatAngle } from './bed-motion.js';
 
 export const MEALS = {
   pancakes: { name: '枫糖松饼', duration: 12, amount: 32 },
@@ -83,13 +86,31 @@ export function planShower(home, object, from, grid) {
   return options.sort((a, b) => a.distance - b.distance)[0] || { error: '淋浴间入口被挡住了' };
 }
 
-export function planActivity(home, object, from, grid, height = 1) {
-  const type = ITEM_MAP[object.type]?.activity;
+export function planHandwash(home, object, from, grid) {
+  const stand=localPoint(object,sinkCenter(object.type),SINK_LAYOUT.standZ), options=[];
+  for(const x of [sinkCenter(object.type),-ITEM_MAP[object.type].width/2,ITEM_MAP[object.type].width/2]) {
+    const entry=localPoint(object,x,SINK_LAYOUT.standZ+.4);
+    const path=findPath(home,from,entry,grid),end=path.at(-1);
+    const corner=localPoint(object,x,SINK_LAYOUT.standZ);
+    if(!end||Math.hypot(end.x-entry.x,end.z-entry.z)>1||
+      !clearCorridor(home,end,corner,object.id)||!clearCorridor(home,corner,stand,object.id))continue;
+    const approach=localPoint(object,sinkCenter(object.type),SINK_LAYOUT.standZ+.04);
+    if(!clearCorridor(home,corner,approach,object.id))continue;
+    const route=[...path,corner,approach];
+    options.push({targetId:object.id,path:route,approach,stand,rotation:object.rotation+Math.PI,
+      floor:surfaceHeight(home,object.x,object.z),fixture:{...object},distance:pathLength(route)});
+  }
+  return options.sort((a,b)=>a.distance-b.distance)[0]||{error:'水槽前方被挡住了，请留出洗手的位置'};
+}
+
+export function planActivity(home, object, from, grid, height = 1, type = ITEM_MAP[object.type]?.activity) {
+  if(!activityTypes(object.type).includes(type))return {error:'这件家具不支持这个活动'};
   if (type === 'eat') return planMeal(home, object.id, from, grid);
   if (type === 'rest' || type === 'toilet') return planSeat(home, object, from, grid);
   if (type === 'sleep') return planSleep(home, object, from, grid, height);
   if (type === 'watch') return planWatch(home, object, from, grid);
   if (type === 'shower') return planShower(home, object, from, grid);
+  if (type === 'washHands') return planHandwash(home, object, from, grid);
   const path = findPath(home, from, object, grid);
   const end = path.at(-1);
   if (!end || Math.hypot(end.x - object.x, end.z - object.z) > 2.3) return { error: '暂时无法到达这件家具' };
@@ -113,9 +134,14 @@ export function planSleep(home, bed, from, grid, height = 1) {
     const entry = localPoint(bed, side * 1.72, z);
     const path = findPath(home, from, entry, grid);
     const end = path.at(-1);
-    const position = localPoint(bed, side * 0.5, 1.97 * height - 0.95);
-    if (!end || Math.hypot(end.x - entry.x, end.z - entry.z) > 0.4 || !clearCorridor(home, end, position, bed.id)) continue;
-    options.push({ targetId: bed.id, path, approach: end, bed: { ...bed }, sleepPosition: position,
+    const edgeSeat=localPoint(bed,side*0.93,z);
+    const approach=localPoint(bed,side*(.93+residentLayout.upperLeg*Math.sin(bedSeatAngle(.75,height))*height),z);
+    const legClearance=localPoint(bed,side*(0.93+0.98*height),z);
+    const sleepHip=localPoint(bed,side*0.5,(residentLayout.mouthHeight-residentLayout.hipHeight)*height-0.95);
+    if (!end || Math.hypot(end.x - entry.x, end.z - entry.z) > 0.4 ||
+      !clearCorridor(home,end,edgeSeat,bed.id) || !clearCorridor(home,end,legClearance,bed.id)) continue;
+    options.push({ targetId: bed.id, path:[...path,approach], approach, bed: { ...bed }, edgeSeat, sleepHip,
+      edgeRotation:bed.rotation+side*Math.PI/2, seatTop:0.75,
       pillow: localPoint(bed, side * 0.5, -0.95), side, rotation: bed.rotation,
       floor: surfaceHeight(home, bed.x, bed.z), sleepY: 0.84 + 0.10 * height, distance: pathLength(path) });
   }

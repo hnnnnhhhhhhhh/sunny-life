@@ -1,23 +1,36 @@
 import * as THREE from 'three';
 
-export function createSleepCover(color) {
+export function sleepCoverHeight(x,z,height=1) {
+  const across=Math.max(0,Math.cos(x/1.27*Math.PI)),along=(z+.57)/1.94;
+  return .83+(.335+Math.max(0,height-1)*.25-along*.065)*Math.pow(across,.66)+Math.sin(z*17+x*11)*.008*across;
+}
+
+export function createSleepCover(color,height=1) {
   const geometry = new THREE.PlaneGeometry(1.27, 1.94, 20, 28);
   const positions = geometry.attributes.position;
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i), z = -positions.getY(i) + 0.4;
-    const across = Math.max(0, Math.cos(x / 1.27 * Math.PI));
-    const along = (z + 0.57) / 1.94;
-    const y = 0.83 + (0.29 - along * 0.065) * Math.pow(across, 0.66) + Math.sin(z * 17 + x * 11) * 0.008 * across;
+    const y = sleepCoverHeight(x,z,height);
     positions.setXYZ(i, x, y, z);
   }
   geometry.computeVertexNormals();
+  const original = positions.array.slice();
   const material = new THREE.MeshStandardMaterial({ color, roughness: 0.96, side: THREE.DoubleSide, transparent: true });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return {
     mesh,
-    update(time, opacity = 1) { material.opacity = opacity; mesh.scale.y = 1 + Math.sin(time * 1.5) * 0.005; },
+    update(time, opacity = 1, lift = 0, side = 1) {
+      material.opacity = opacity;
+      for(let i=0;i<positions.count;i++) {
+        const edge=(original[i*3]/0.635*side+1)/2;
+        positions.setY(i,original[i*3+1]+lift*0.18*edge);
+      }
+      positions.needsUpdate=true;
+      geometry.computeVertexNormals();
+      mesh.scale.y = 1 + Math.sin(time * 1.5) * 0.005;
+    },
     dispose() { geometry.dispose(); material.dispose(); },
   };
 }

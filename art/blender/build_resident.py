@@ -12,6 +12,7 @@ from mathutils import Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_furniture as b
+from artist_parts import HEAD_SHIFT, HEAD_FORWARD, LAYOUT
 
 PARTS = []
 RIG = None
@@ -107,8 +108,9 @@ def leg_weights(side):
 
 
 def torso_weights(p):
-    if p.z < 1.22:
-        return {"Hips": 1}
+    if p.z < 1.3:
+        amount = min(1, max(0, (p.z - 1.12) / 0.18))
+        return {"Hips": 1 - amount, "Spine": amount}
     amount = min(1, max(0, (p.z - 1.3) / 0.28))
     return {"Spine": 1 - amount, "Chest": amount}
 
@@ -125,11 +127,11 @@ def bone_rig():
         ("Hips", (0, 1.08, 0), (0, 1.22, 0), "Root"),
         ("Spine", (0, 1.22, 0), (0, 1.53, 0), "Hips"),
         ("Chest", (0, 1.53, 0), (0, 1.69, 0), "Spine"),
-        ("Neck", (0, 1.69, 0), (0, 1.81, 0), "Chest"),
-        ("Head", (0, 1.81, 0), (0, 2.14, 0), "Neck"),
-        ("Jaw", (0, 1.85, 0.055), (0, 1.92, 0.055), "Head"),
-        ("Mouth", (0, 1.895, 0.175), (0, 1.925, 0.175), "Head"),
-        ("Nose", (0, 1.95, 0.13), (0, 1.975, 0.13), "Head"),
+        ("Neck", (0, 1.69, 0), (0, LAYOUT["headBase"], HEAD_FORWARD), "Chest"),
+        ("Head", (0, LAYOUT["headBase"], HEAD_FORWARD), (0, 2.14 + HEAD_SHIFT, HEAD_FORWARD), "Neck"),
+        ("Jaw", (0, 1.85 + HEAD_SHIFT, 0.055 + HEAD_FORWARD), (0, 1.92 + HEAD_SHIFT, 0.055 + HEAD_FORWARD), "Head"),
+        ("Mouth", (0, LAYOUT["mouthHeight"], 0.175 + HEAD_FORWARD), (0, LAYOUT["mouthHeight"] + 0.03, 0.175 + HEAD_FORWARD), "Head"),
+        ("Nose", (0, 1.95 + HEAD_SHIFT, 0.13 + HEAD_FORWARD), (0, 1.975 + HEAD_SHIFT, 0.13 + HEAD_FORWARD), "Head"),
         ("HandTarget", (0.1, 1.6, 0.3), (0.1, 1.65, 0.3), "Root"),
     ]
     for side, s in [("L", -1), ("R", 1)]:
@@ -137,10 +139,12 @@ def bone_rig():
             (f"UpperArm_{side}", (s * 0.218, 1.635, 0), (s * 0.263, 1.32, 0), "Chest"),
             (f"Forearm_{side}", (s * 0.263, 1.32, 0), (s * 0.278, 1.03, 0), f"UpperArm_{side}"),
             (f"Hand_{side}", (s * 0.278, 1.03, 0), (s * 0.282, 0.9, 0.008), f"Forearm_{side}"),
+            (f"Palm_{side}", (s * 0.282, 0.964, 0.005), (s * 0.282, 0.94, 0.005), f"Hand_{side}"),
+            (f"WashTarget_{side}", (s * 0.1, 1.1, 0.4), (s * 0.1, 1.15, 0.4), "Root"),
             (f"Thigh_{side}", (s * 0.115, 1.08, 0), (s * 0.115, 0.58, 0.005), "Hips"),
             (f"Shin_{side}", (s * 0.115, 0.58, 0.005), (s * 0.115, 0.09, 0), f"Thigh_{side}"),
             (f"Foot_{side}", (s * 0.115, 0.09, 0), (s * 0.115, 0.09, 0.19), f"Shin_{side}"),
-            (f"Eye_{side}", (s * 0.058, 1.975, 0.13), (s * 0.058, 2.005, 0.13), "Head"),
+            (f"Eye_{side}", (s * 0.058, LAYOUT["eyeHeight"], 0.13 + HEAD_FORWARD), (s * 0.058, LAYOUT["eyeHeight"] + .03, 0.13 + HEAD_FORWARD), "Head"),
         ])
     definitions.append(("UtensilTip", (0.282, 0.820, 0.025), (0.282, 0.840, 0.025), "Hand_R"))
     for name, head, tail, parent in definitions:
@@ -162,8 +166,9 @@ def body():
         loft(f"Turned cuff {side}", [(s*.12,.16,0,.084,.074),(s*.12,.215,0,.084,.074)], "TrouserCuff", f"Shin_{side}", 8)
         rounded(f"Canvas sneaker {side}", (s*.115,.086,.063), (.188,.15,.335), "Shoes", f"Foot_{side}", .037)
         rounded(f"Rubber sole {side}", (s*.115,.024,.065), (.196,.048,.347), "Sole", f"Foot_{side}", .014)
+        rounded(f"Sleep sock {side}", (s*.115,.075,.06), (.158,.13,.295), "Undershirt", f"Foot_{side}", .03, accessory="sleep-socks")
         for z in [.035,.078,.118]:
-            line("Shoe lace", [(s*.115-.057,.165,z),(s*.115+.057,.165,z+.011)], .004, "Undershirt", f"Foot_{side}")
+            line("Shoe lace", [(s*.115-.057,.165,z),(s*.115+.057,.165,z+.011)], .004, "Sole", f"Foot_{side}")
         loft(f"Skin arm {side}", [(s*.248,1.46,0,.044,.049),
              (s*.263,1.33,0,.04,.045),(s*.275,1.17,0,.036,.04),(s*.278,1.025,0,.029,.032)],
              "Skin", arm_weights(side), 8)
@@ -222,11 +227,11 @@ def garment_shell(outfit):
         hole = [(s*.222,1.638,0),(s*.211,1.610,.073),(s*.196,1.545,.1),
                 (s*.187,1.49,.073),(s*.184,1.467,0),(s*.187,1.49,-.068),
                 (s*.196,1.545,-.091),(s*.211,1.610,-.068)]
-        front = [(s*.184,hem,.09),(s*.177,1.28,.103),hole[3],hole[2],hole[1]]
-        back = [(s*.184,hem,-.105),(s*.177,1.28,-.115),hole[5],hole[6],hole[7]]
-        inner = [(s*.04,hem,.129),(s*.041,1.28,.134),(s*.043,1.46,.137),
+        front = [(s*.220,hem,.125),(s*.192,1.28,.115),hole[3],hole[2],hole[1]]
+        back = [(s*.220,hem,-.135),(s*.192,1.28,-.13),hole[5],hole[6],hole[7]]
+        inner = [(s*.04,hem,.150),(s*.041,1.28,.145),(s*.043,1.46,.137),
                  (s*.053,1.565,.126),(s*.075,1.685,.078)]
-        center_back = [(0,hem,-.123),(0,1.28,-.131),(0,1.48,-.135),
+        center_back = [(0,hem,-.165),(0,1.28,-.152),(0,1.48,-.135),
                        (0,1.59,-.113),(0,1.685,-.073)]
         front_rows = panel(inner,front)
         back_rows = panel(center_back,back)
@@ -300,10 +305,11 @@ def hair():
 def accessories():
     for s in [-1,1]:
         x = s*.055
-        bcoords = [(x-.039,1.95,.165),(x-.043,2.0,.159),(x+.04,2.0,.159),(x+.038,1.95,.165)]
+        bcoords = [(x-.039,1.95+HEAD_SHIFT,.165+HEAD_FORWARD),(x-.043,2.0+HEAD_SHIFT,.159+HEAD_FORWARD),
+                   (x+.04,2.0+HEAD_SHIFT,.159+HEAD_FORWARD),(x+.038,1.95+HEAD_SHIFT,.165+HEAD_FORWARD)]
         line("Angular glasses frame", bcoords+[bcoords[0]], .006, "Glasses", "Head", accessory="glasses")
-        line("Glasses temple", [(s*.097,1.994,.164),(s*.14,1.986,.028)], .0045, "Glasses", "Head", accessory="glasses")
-    line("Glasses bridge", [(-.013,1.982,.165),(0,1.988,.168),(.013,1.982,.165)], .005, "Glasses", "Head", accessory="glasses")
+        line("Glasses temple", [(s*.097,1.994+HEAD_SHIFT,.164+HEAD_FORWARD),(s*.14,1.986+HEAD_SHIFT,.028+HEAD_FORWARD)], .0045, "Glasses", "Head", accessory="glasses")
+    line("Glasses bridge", [(-.013,1.982+HEAD_SHIFT,.165+HEAD_FORWARD),(0,1.988+HEAD_SHIFT,.168+HEAD_FORWARD),(.013,1.982+HEAD_SHIFT,.165+HEAD_FORWARD)], .005, "Glasses", "Head", accessory="glasses")
     rounded("Fork handle", (.282,.934,.025), (.022,.124,.012), "Metal", "Hand_R", .007, accessory="fork")
     rounded("Fork shoulder", (.282,.856,.025), (.034,.047,.009), "Metal", "Hand_R", .004, accessory="fork")
     for i in range(3):
@@ -311,6 +317,9 @@ def accessories():
     rounded("Fork bite", (.282,.818,.027), (.036,.027,.033), "Food", "UtensilTip", .009, accessory="bite")
     # A hidden degenerate point keeps the non-deforming IK target in the glTF skin.
     poly("IK target binding", [(0.1,1.6,.3)]*3, [(0,1,2)], "Skin", "HandTarget", accessory="ik-helper")
+    for side, s in [("L",-1),("R",1)]:
+        for name in [f"WashTarget_{side}", f"Palm_{side}"]:
+            poly(f"{name} binding", [(s*.1,1.1,.4)]*3, [(0,1,2)], "Skin", name, accessory="ik-helper")
 
 
 def skin_and_pack():
@@ -466,7 +475,7 @@ def main():
     content = destination.read_bytes()
     manifest = {"generator":f"Blender {bpy.app.version_string}","file":"models/resident/resident.glb",
                 "source":"art/blender/sunny-resident.blend","bytes":len(content),
-                "sha256":hashlib.sha256(content).hexdigest(),"height":2.25,"hipHeight":1.08,
+                "sha256":hashlib.sha256(content).hexdigest(),"height":2.25+HEAD_SHIFT,"hipHeight":LAYOUT["hipHeight"],
                 "animations":["Idle","Walk","SitDown","SitIdle","Eat","StandUp","Talk","Listen"],
                 "artist":"Quaternius, Universal Base Characters (CC0)",
                 "sourceUrl":"https://quaternius.com/packs/universalbasecharacters.html"}

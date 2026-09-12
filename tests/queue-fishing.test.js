@@ -54,7 +54,7 @@ test('incremental benefit accounting is monotonic and does not reward twice',()=
   action.progress=0.5; runner.creditProgress(action);
   action.progress=1; runner.creditProgress(action);
   assert.equal(events.reduce((sum,e)=>sum+e.amount,0),26);
-  assert.equal(NEED_DECAY.hygiene,0.032);
+  assert.equal(NEED_DECAY.hygiene*1440,30);
 });
 
 test('all fishing spots have exact reachable ground and cast into actual water',()=>{

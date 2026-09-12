@@ -2,9 +2,14 @@
 import bpy
 import bmesh
 import numpy as np
+import json
+from pathlib import Path
 from mathutils import Matrix, Vector
 
-NECK_CUT = 1.765
+LAYOUT = json.loads((Path(__file__).resolve().parents[2] / "src/resident-layout.json").read_text())
+HEAD_SHIFT = LAYOUT["headShift"]
+HEAD_FORWARD = LAYOUT["headForward"]
+NECK_CUT = 1.765 + HEAD_SHIFT
 
 
 def image_material(name, image, reference="#ffffff"):
@@ -84,12 +89,12 @@ def transform(obj, scale, offset):
 
 def skin_weights(p):
     x, y, z = p.x, p.z, -p.y
-    if y < 1.81:
-        amount = max(0, min(1, (y - 1.62) / 0.15))
+    if y < LAYOUT["headBase"]:
+        amount = max(0, min(1, (y - 1.62) / 0.135))
         return {"Chest": 1 - amount, "Neck": amount}
-    if abs(x) < 0.03 and 1.925 < y < 1.98 and z > 0.15:
+    if abs(x) < 0.03 and 1.925 + HEAD_SHIFT < y < 1.98 + HEAD_SHIFT and z > 0.15 + HEAD_FORWARD:
         return {"Head": 0.45, "Nose": 0.55}
-    if y < 1.94 and z > 0.08:
+    if y < 1.94 + HEAD_SHIFT and z > 0.08 + HEAD_FORWARD:
         return {"Head": 0.7, "Jaw": 0.3}
     return {"Head": 1}
 
@@ -98,15 +103,16 @@ def connect_neck(obj, material):
     # into the narrower neck of this rig before bridging the shared cut ring.
     for vertex in obj.data.vertices:
         p = vertex.co
-        if p.z >= 1.845 or p.y < -0.075:
+        upper = 1.940 + HEAD_SHIFT
+        if p.z >= upper or p.y < -0.075 - HEAD_FORWARD:
             continue
-        t = max(0, min(1, (1.845 - p.z) / (1.845 - NECK_CUT)))
+        t = max(0, min(1, (upper - p.z) / (upper - NECK_CUT)))
         weight = t * t * (3 - 2 * t)
-        radial = Vector((p.x / 0.072, (p.y - 0.018) / 0.070))
+        radial = Vector((p.x / 0.060, (p.y + 0.012) / 0.048))
         if radial.length > 1:
             radial.normalize()
-            p.x = p.x * (1 - weight) + radial.x * 0.072 * weight
-            p.y = p.y * (1 - weight) + (0.018 + radial.y * 0.070) * weight
+            p.x = p.x * (1 - weight) + radial.x * 0.060 * weight
+            p.y = p.y * (1 - weight) + (-0.012 + radial.y * 0.048) * weight
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     bmesh.ops.remove_doubles(bm, verts=list(bm.verts), dist=0.00001)
@@ -117,7 +123,7 @@ def connect_neck(obj, material):
     center = sum((v.co for v in vertices), Vector()) / len(vertices)
     edges = [(edge.verts[0], edge.verts[1]) for edge in rim]
     uv = bm.loops.layers.uv.active
-    for height, rx, ry, cy in [(1.715, 0.068, 0.060, 0.022), (1.675, 0.085, 0.058, 0.01), (1.61, 0.10, 0.065, 0)]:
+    for height, rx, ry, cy in [(1.700, 0.059, 0.048, -0.008), (1.67, 0.077, 0.058, 0), (1.61, 0.10, 0.065, 0)]:
         next_ring = {}
         for vertex in vertices:
             radial = Vector((vertex.co.x - center.x, vertex.co.y - center.y))
@@ -161,7 +167,7 @@ def attach(project, register, skin_material):
         eye_z = sum((eyes.data.vertices[i].co.z for i in range(len(eyes.data.vertices)))) / len(eyes.data.vertices)
         head_top = max(v.co.z for v in body.data.vertices)
         scale = 0.175 / (head_top - eye_z)
-        offset = Vector((0, -0.026, 1.975 - eye_z * scale))
+        offset = Vector((0, -0.026 - HEAD_FORWARD, LAYOUT["eyeHeight"] - eye_z * scale))
         calibrations[base] = (scale, offset)
         bm = bmesh.new()
         bm.from_mesh(body.data)

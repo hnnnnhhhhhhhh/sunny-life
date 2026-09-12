@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { CCDIKSolver } from 'three/addons/animation/CCDIKSolver.js';
 import manifest from './assets/resident-manifest.json';
+import layout from './resident-layout.json' with { type:'json' };
 
 let residentAsset, loading, loadError;
 const materials = new Map();
@@ -98,7 +99,7 @@ export function createResidentModel(avatar) {
     head: bones.get('Head'), torso: bones.get('Chest'),
     arms: [bones.get('UpperArm_L'), bones.get('UpperArm_R')],
     legs: [bones.get('Thigh_L'), bones.get('Thigh_R')],
-    portraitTarget: [0, 1.975 * avatar.height, 0.035],
+    portraitTarget: [0, layout.eyeHeight * avatar.height, 0.035 + layout.headForward],
     portraitExtent: 0.8 * avatar.height,
   };
   controller.update(0);
@@ -124,6 +125,10 @@ class ResidentAnimator {
       target: indices.HandTarget, effector: indices.UtensilTip, iteration: 12, maxAngle: 0.15,
       links: [{ index: indices.Hand_R }, { index: indices.Forearm_R }, { index: indices.UpperArm_R }],
     }]);
+    this.washIK = new CCDIKSolver(skin, ['L','R'].map(side=>({
+      target:indices[`WashTarget_${side}`],effector:indices[`Palm_${side}`],iteration:24,maxAngle:.22,
+      links:[{index:indices[`Hand_${side}`]},{index:indices[`Forearm_${side}`]},{index:indices[`UpperArm_${side}`]}],
+    })));
   }
 
   play(name, fade = 0.15) {
@@ -151,6 +156,7 @@ class ResidentAnimator {
 
   update(delta, seatedWeight = 0, seatTop = 0.57) {
     this.time += delta;
+    this.washTargets=null;
     // Mixer bindings cache unchanged tracks; restore their pose before applying IK
     // or body-shape corrections so those corrections cannot accumulate.
     for (const pose of this.basePose) {
@@ -203,9 +209,59 @@ class ResidentAnimator {
   }
 
   sleepWear(sleeping) {
+    this.showAccessory('sleep-socks',sleeping);
     this.rig.traverse(node => {
       if (['Shoes', 'Sole'].includes(node.userData.role)) node.visible = !sleeping;
     });
+  }
+
+  bedPose(pose) {
+    const rotate=(name,x,z=0)=>this.bones.get(name).quaternion.multiply(
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(x,0,z)));
+    const thigh=-THREE.MathUtils.lerp(pose.seatedAngle,Math.PI/2,pose.legs)*pose.sit*(1-pose.recline);
+    const shin=pose.seatedAngle*pose.sit*(1-pose.legs);
+    for(const [i,side] of ['L','R'].entries()) {
+      rotate(`Thigh_${side}`,thigh);
+      rotate(`Shin_${side}`,shin);
+      rotate(`Foot_${side}`,1.4*pose.legs);
+      rotate(`UpperArm_${side}`,-0.05*pose.sit,(i?1:-1)*0.07*pose.sit);
+      rotate(`Forearm_${side}`,-0.06*pose.sit);
+    }
+    rotate('Chest',0.025*pose.recline);
+    rotate('Neck',0.07*pose.recline);
+    this.root.updateMatrixWorld(true);
+  }
+
+  anchorHips(target,rotation) {
+    this.root.position.set(0,0,0);
+    this.root.quaternion.copy(rotation);
+    this.root.updateMatrixWorld(true);
+    const offset=this.point('Hips');
+    this.root.position.copy(target).sub(offset);
+    this.root.updateMatrixWorld(true);
+  }
+
+  handwashPose(targets, time, weight = 1) {
+    const lean=THREE.MathUtils.lerp(.56,.76,THREE.MathUtils.clamp((this.avatar.height-.85)/.3,0,1))*weight;
+    this.bones.get('Spine').rotation.x+=lean;
+    this.bones.get('Neck').rotation.x+=.12*weight;
+    for(const [i,side] of ['L','R'].entries()) {
+      this.bones.get(`UpperArm_${side}`).rotation.x-=.7*weight;
+      this.bones.get(`UpperArm_${side}`).rotation.z+=(i?.18:-.18)*weight;
+      this.bones.get(`Forearm_${side}`).rotation.x-=.7*weight;
+      this.bones.get(`Hand_${side}`).rotation.y+=Math.sin(time*9+i)*.25*weight;
+    }
+    this.root.updateMatrixWorld(true);
+    for(const [side,key] of [['L','left'],['R','right']]) {
+      const goal=this.bones.get(`WashTarget_${side}`);
+      const target=this.point(`Palm_${side}`).lerp(targets[key],weight);
+      goal.position.copy(goal.parent.worldToLocal(target));
+      goal.updateMatrixWorld(true);
+    }
+    this.washIK.update();
+    this.root.updateMatrixWorld(true);
+    this.washTargets=weight>0?targets:null;
+    return {left:this.point('Palm_L'),right:this.point('Palm_R')};
   }
 
   washPose(time) {
@@ -243,6 +299,9 @@ class ResidentAnimator {
       fork: tip.toArray(), target: this.lastTarget?.toArray() || null,
       targetDistance: this.lastTarget ? tip.distanceTo(this.lastTarget) : null,
       feet: ['Foot_L', 'Foot_R'].map(name => this.point(name).toArray()),
+      knees:['Shin_L','Shin_R'].map(name=>this.point(name).toArray()),
+      palms:['Palm_L','Palm_R'].map(name=>this.point(name).toArray()),
+      washDistances:this.washTargets?['left','right'].map((key,i)=>this.point(i?'Palm_R':'Palm_L').distanceTo(this.washTargets[key])):null,
     };
   }
 

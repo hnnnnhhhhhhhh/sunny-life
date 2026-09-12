@@ -166,7 +166,7 @@ function fence(g) {
 export function createEnvironment() {
   const root = new THREE.Group(), solid = new THREE.Group(), surfaces = [], assets = [];
   const ocean = createOcean(), water = ocean.mesh;
-  const seabed = new THREE.Mesh(new THREE.PlaneGeometry(240,240),new THREE.MeshBasicMaterial({color:'#236779'}));
+  const seabed = new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),new THREE.MeshBasicMaterial({color:'#236779'}));
   seabed.rotation.x=-Math.PI/2; seabed.position.y=-5.8;
   seabed.userData.disposable=seabed.userData.ownMaterial=true; root.add(seabed);
   root.add(water);

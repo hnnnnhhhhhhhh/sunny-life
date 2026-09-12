@@ -1,4 +1,4 @@
-import { ACTIVITIES, ITEM_MAP, uid } from './game.js';
+import { ACTIVITIES, ITEM_MAP, activityTypes, uid } from './game.js';
 import { FISHING_SPOTS } from './fishing.js';
 
 export class ActionQueue {
@@ -15,8 +15,9 @@ export class ActionQueue {
     if (command.kind === 'furniture') {
       const object = world.state.game.home.furniture.find(f => f.id === command.targetId);
       const info = object && ITEM_MAP[object.type];
-      if (!info?.activity) return false;
-      label = ACTIVITIES[info.activity].label; detail = info.name;
+      const activity=command.activity||info?.activity;
+      if (!info || !activityTypes(object.type).includes(activity)) return false;
+      label = ACTIVITIES[activity].label; detail = info.name;
     } else if (command.kind === 'chat') {
       const person = world.npcs.find(n => n.id === command.targetId);
       if (!person) return false;
@@ -60,7 +61,7 @@ export class ActionQueue {
     while (this.items.length) {
       const next = this.items.shift();
       this.emit();
-      const started = next.kind === 'furniture' ? world.activities.start(next.targetId,next.recipe)
+      const started = next.kind === 'furniture' ? world.activities.start(next.targetId,next.recipe,{activity:next.activity})
         : next.kind === 'chat' ? world.activities.startChat(next.targetId)
           : next.kind === 'fish' ? world.activities.startFishing(next.targetId)
             : world.navigateTo(next.target);
