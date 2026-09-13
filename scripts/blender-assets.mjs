@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { optimizeResident } from './optimize-resident.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const candidates = [
@@ -29,4 +30,5 @@ if (!rebuild) args.push('--export-only');
 console.log(rebuild ? 'Rebuilding the generated .blend source and GLB models.' : 'Exporting GLB models from the existing .blend source; manual edits are preserved.');
 const result = spawnSync(blender, args, { cwd: root, stdio: 'inherit' });
 if (result.error) console.error(result.error.message);
-process.exit(result.status ?? 1);
+if(result.status!==0)process.exit(result.status??1);
+if(kind==='resident')await optimizeResident(root);

@@ -2,8 +2,8 @@
   "generator": "Blender 4.5.3 LTS",
   "file": "models/resident/resident.glb",
   "source": "art/blender/sunny-resident.blend",
-  "bytes": 4430412,
-  "sha256": "30c5523b386cad6bf5faac936457e7163dfdce8ad8a2fe838b88e77e5e74ebc8",
+  "bytes": 2840268,
+  "sha256": "b5161ff0592de0efc7e0358d014c265e26a233f002dd6b6063e2dc1af75bfa9a",
   "height": 2.21,
   "hipHeight": 1.08,
   "animations": [
@@ -17,5 +17,8 @@
     "Listen"
   ],
   "artist": "Quaternius, Universal Base Characters (CC0)",
-  "sourceUrl": "https://quaternius.com/packs/universalbasecharacters.html"
+  "sourceUrl": "https://quaternius.com/packs/universalbasecharacters.html",
+  "compressedFile": "models/resident/resident.glb.gz",
+  "compressedBytes": 1495681,
+  "compressedSha256": "2d22d50ba9853eb6d9bf6e6d4f5e2e6e4c3e45fb8e212d8c2a063f69a304e7c5"
 }

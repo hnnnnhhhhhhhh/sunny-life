@@ -15,7 +15,7 @@ export async function loadBlenderModels() {
   const loader = new GLTFLoader();
   const loadCollection = (collection, target, errors) => collection.assets.map(async asset => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
     try {
       const url = `${import.meta.env.BASE_URL}${asset.file}?v=${asset.sha256.slice(0, 12)}`;
       const response = await fetch(url, { signal: controller.signal });

@@ -16,7 +16,7 @@ class GameBoundary extends React.Component {
 }
 
 const root = createRoot(document.getElementById('root'));
-root.render(<div className="world-loading" role="status"><strong>正在布置橡树小屋</strong></div>);
-Promise.all([loadBlenderModels(), loadResidentAssets()]).then(([status, resident]) => {
+root.render(<div className="world-loading" role="status"><strong>正在布置家园</strong></div>);
+Promise.all([loadResidentAssets(), loadBlenderModels()]).then(([resident,status]) => {
   root.render(<GameBoundary><App modelWarning={!resident.loaded || Object.keys(status.failed).length + Object.keys(status.scenery.failed).length > 0} /></GameBoundary>);
 });

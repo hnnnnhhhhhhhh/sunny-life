@@ -12,11 +12,18 @@ export function loadResidentAssets() {
   if (loading) return loading;
   loading = (async () => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000);
+    const timer = setTimeout(() => controller.abort(), 60000);
     try {
-      const response = await fetch(`${import.meta.env.BASE_URL}${manifest.file}?v=${manifest.sha256.slice(0, 12)}`, { signal: controller.signal });
+      const compressed=manifest.compressedFile&&typeof DecompressionStream!=='undefined';
+      const file=compressed?manifest.compressedFile:manifest.file;
+      const hash=compressed?manifest.compressedSha256:manifest.sha256;
+      const response = await fetch(`${import.meta.env.BASE_URL}${file}?v=${hash.slice(0,12)}`, { signal: controller.signal,priority:'high' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const buffer = await response.arrayBuffer();
+      let buffer=await response.arrayBuffer();
+      const signature=new Uint8Array(buffer,0,Math.min(2,buffer.byteLength));
+      // HTTP Content-Encoding may already have been decoded by the browser.
+      if(compressed&&signature[0]===0x1f&&signature[1]===0x8b)
+        buffer=await new Response(new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
       residentAsset = await new GLTFLoader().parseAsync(buffer, '');
       for (const name of manifest.animations) {
         if (!residentAsset.animations.some(clip => clip.name === name)) throw new Error(`Missing animation: ${name}`);
