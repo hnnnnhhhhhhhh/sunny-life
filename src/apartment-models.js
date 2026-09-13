@@ -194,7 +194,7 @@ export function createApartmentEnvironment() {
   return {root,upper,surfaces:[floorSurface],setExterior(value){upper.visible=value;},
     setNight(amount){
       for(const mat of nightMaterials)mat.emissiveIntensity=amount*.65;
-      for(const light of streetLights)light.intensity=amount*5;
+      for(const light of streetLights){light.intensity=amount*5;light.visible=amount>0;}
     },
     dispose(){signTexture.dispose();},
     diagnostics(){return {style:'urban-apartment',floor:3,storeys:3,exterior:upper.visible};}};

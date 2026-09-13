@@ -4,7 +4,7 @@ import {newApartmentGame,newGame,navigationGrid,activityTypes,migrateGame} from 
 import {planComputer,localPoint} from '../src/interactions.js';
 import {autonomousCandidates} from '../src/autonomy.js';
 import {ActionQueue} from '../src/action-queue.js';
-import {daylightAt} from '../src/daylight.js';
+import {daylightAt,createHomeLighting} from '../src/daylight.js';
 
 test('daylight is continuous at midnight and every lighting keyframe',()=>{
   assert.equal(daylightAt(0).sky.getHex(),daylightAt(1440).sky.getHex());
@@ -18,6 +18,18 @@ test('daylight is continuous at midnight and every lighting keyframe',()=>{
   assert.equal(daylightAt(720).lamps,0);
   assert.equal(daylightAt(1320).lamps,1);
   assert.ok(daylightAt(1320).sun<daylightAt(720).sun/5);
+});
+
+test('extinguished lights leave the render traversal and return at night',()=>{
+  const lighting=createHomeLighting(newApartmentGame().home,()=>.25);
+  const visibleLights=()=>{
+    const lights=[];lighting.root.traverseVisible(node=>{if(node.isLight)lights.push(node);});return lights;
+  };
+  lighting.update(0);assert.equal(visibleLights().length,0);
+  lighting.update(1);assert.equal(visibleLights().length,4);
+  assert.ok(visibleLights().every(light=>light.intensity>0));
+  lighting.update(0);assert.equal(visibleLights().length,0);
+  lighting.root.traverse(node=>{node.geometry?.dispose();node.material?.dispose();});
 });
 
 test('computer supports optional reading, rotated seat access and rejects blocked chairs',()=>{

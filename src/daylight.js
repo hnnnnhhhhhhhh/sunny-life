@@ -52,7 +52,10 @@ export function createHomeLighting(home, floorAt) {
     ceiling.push(shade);
   }
   return {root,update(amount){
-    for(const {light,power} of lights)light.intensity=power*amount;
+    for(const {light,power} of lights){
+      light.intensity=power*amount;
+      light.visible=amount>0;
+    }
     for(const glow of glows)glow.material.emissiveIntensity=amount*2.5;
   },setCeilingVisible(visible){for(const mesh of ceiling)mesh.visible=visible;},
   diagnostics(){return lights.map(({light})=>({position:light.position.toArray(),intensity:light.intensity}));}};
