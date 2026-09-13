@@ -125,9 +125,10 @@ def attach(project, rig, register, material):
             mesh.from_pydata(vertices, [], [tuple(lookup[i] for i in p.vertices) for p in polygons])
             mesh.materials.append(material("Iris" if role == "Eyes" else role))
             mesh.update()
-            if variant == "cardigan" and role == "Top":
+            if role in {"Skin", "Top", "Trousers", "Hair", "Undershirt", "Shoes"}:
                 for polygon in mesh.polygons:
                     polygon.use_smooth = True
+                mesh.set_sharp_from_angle(angle=math.radians(62 if role == "Skin" else 52))
             obj = bpy.data.objects.new(mesh.name, mesh)
             bpy.context.scene.collection.objects.link(obj)
             for i, weights in enumerate(bindings):
@@ -157,6 +158,9 @@ def attach(project, rig, register, material):
                 bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
                 bm.to_mesh(mesh)
                 bm.free()
+                for polygon in mesh.polygons:
+                    polygon.use_smooth = True
+                mesh.set_sharp_from_angle(angle=math.radians(62))
             register(obj, role, None, variant, accessory)
 
     for base in ["female", "male"]:

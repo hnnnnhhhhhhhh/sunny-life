@@ -13,6 +13,8 @@
     "resident:export": "node scripts/blender-assets.mjs --resident",
     "resident:rebuild": "node scripts/blender-assets.mjs --resident --rebuild",
     "resident:optimize": "node scripts/optimize-resident.mjs",
+    "supplied:export": "node scripts/supplied-assets.mjs",
+    "supplied:rebuild": "node scripts/supplied-assets.mjs --rebuild",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test tests/*.test.js",
@@ -32,6 +34,7 @@
     "@gltf-transform/functions": "^4.5.0",
     "@playwright/test": "^1.55.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "sharp": "^0.35.4",
     "vite": "^6.0.3"
   }
 }

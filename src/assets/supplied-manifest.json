@@ -1,0 +1,123 @@
+{
+  "generator": "Blender 4.5.3 LTS",
+  "file": "models/supplied/furnishings.glb",
+  "source": "art/blender/sunny-supplied.blend",
+  "license": "CC-BY-SA-4.0",
+  "assets": [
+    {
+      "type": "kitchen",
+      "node": "Supplied_kitchen",
+      "footprint": [
+        3.9,
+        0.95
+      ],
+      "grounded": true,
+      "triangles": 2224,
+      "bounds": {
+        "min": [
+          -1.9500000476837158,
+          0,
+          -0.4700000584125519
+        ],
+        "max": [
+          1.940000057220459,
+          1.4745007753372192,
+          0.4699999988079071
+        ]
+      }
+    },
+    {
+      "type": "sink",
+      "node": "Supplied_sink",
+      "footprint": [
+        1.1,
+        0.8
+      ],
+      "grounded": true,
+      "triangles": 1054,
+      "bounds": {
+        "min": [
+          -0.5400000214576721,
+          0,
+          -0.39000001549720764
+        ],
+        "max": [
+          0.5400000214576721,
+          1.4745007753372192,
+          0.38999995589256287
+        ]
+      }
+    },
+    {
+      "type": "fridge",
+      "node": "Supplied_fridge",
+      "footprint": [
+        0.9,
+        0.85
+      ],
+      "grounded": true,
+      "triangles": 2110,
+      "bounds": {
+        "min": [
+          -0.4399999976158142,
+          0,
+          -0.41499996185302734
+        ],
+        "max": [
+          0.4399999976158142,
+          2.0799999237060547,
+          0.41499996185302734
+        ]
+      }
+    },
+    {
+      "type": "toilet",
+      "node": "Supplied_toilet",
+      "footprint": [
+        0.8,
+        1.15
+      ],
+      "grounded": true,
+      "triangles": 1067,
+      "bounds": {
+        "min": [
+          -0.3708510398864746,
+          -9.153171554032724e-10,
+          -0.46705055236816406
+        ],
+        "max": [
+          0.34567099809646606,
+          1.1093330383300781,
+          0.4128170907497406
+        ]
+      }
+    },
+    {
+      "type": "plumbob",
+      "node": "Supplied_plumbob",
+      "footprint": [
+        0.2,
+        0.2
+      ],
+      "grounded": false,
+      "triangles": 20,
+      "bounds": {
+        "min": [
+          -0.08511950075626373,
+          -0.16999998688697815,
+          -0.07390225678682327
+        ],
+        "max": [
+          0.08511950075626373,
+          0.17000000178813934,
+          0.07390225678682327
+        ]
+      }
+    }
+  ],
+  "bytes": 406620,
+  "sha256": "0ab74e6fa14d4b723f872882e0c9d64dcd65ffa94e23aa3d5735cbd8daf44222",
+  "compressedFile": "models/supplied/furnishings.glb.gz",
+  "compressedBytes": 234472,
+  "compressedSha256": "e365440a66ad4190a3a3dd3ddafb41c000d4a281d7502ddb681d7a0b5a68c4a3"
+}

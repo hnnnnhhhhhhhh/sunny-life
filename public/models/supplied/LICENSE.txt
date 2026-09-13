@@ -1,0 +1,52 @@
+SUNNY LIFE - SUPPLIED MODEL CREDITS
+
+The adapted models in furnishings.glb and furnishings.glb.gz, and their
+editable source art/blender/sunny-supplied.blend, are distributed under
+Creative Commons Attribution-ShareAlike 4.0 International:
+https://creativecommons.org/licenses/by-sa/4.0/
+https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+This asset license does not change the license of the game code or of
+other, separately distributed model collections.
+
+1. Low Poly Kitchen Assets - The Sims 4 Style
+Author: Alex / littledica
+Author profile: https://sketchfab.com/littledica
+Original license: CC Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+Source:
+https://sketchfab.com/3d-models/low-poly-kitchen-assets-the-sims-4-style-1b4df6f81f5d48bc81df0560734292d3
+Adaptation: selected and rearranged cabinet, sink, range, microwave and
+refrigerator geometry; closed appliance doors; baked rest poses; removed
+display-only shadows; converted the legacy material workflow; recolored
+surfaces and resized textures; added interactive tap and soap controls.
+
+2. Sims 3 Bargain John Cheap Toilet Left Flush
+Author: Yaiyeondurising / 5Life
+Author profile: https://sketchfab.com/5Life
+Original license: CC Attribution-ShareAlike 4.0
+https://creativecommons.org/licenses/by-sa/4.0/
+Source:
+https://sketchfab.com/3d-models/sims-3-bargain-john-cheap-toilet-left-flush-8d799c7c87584ba2bf5bf032f82884d2
+Adaptation: scale and origin calibration, ceramic/chrome materials,
+softened edges, water surface and an isolated flush-handle pivot.
+
+3. The Sims: Plumbob
+Author: BenK / BenK656
+Author profile: https://sketchfab.com/BenK656
+Original license: CC Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+Source:
+https://sketchfab.com/3d-models/the-sims-plumbob-8dadd87ba9e049c596765857fff2f527
+Adaptation: retained the 20-triangle geometry, recentered and rescaled it,
+replaced the large texture set with a jade-colored material.
+
+Adaptations by the Sunny Life project, 2026-09-13.
+Original authors do not endorse this project.
+The supplied Mrs_Afton and Agnes character files are NOT distributed here.
+
+Existing resident models:
+Quaternius, Ultimate Modular Women / Men, CC0 1.0.
+https://quaternius.com/packs/ultimatemodularwomen.html
+https://quaternius.com/packs/ultimatemodularcharacters.html
+https://creativecommons.org/publicdomain/zero/1.0/

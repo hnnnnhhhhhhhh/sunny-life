@@ -26,5 +26,5 @@ loadResidentAssets((loaded,total)=>{
 }).then(async resident => {
   root.render(<div className="world-loading" role="status"><strong>正在布置家园</strong></div>);
   const status=await loadBlenderModels();
-  root.render(<GameBoundary><App modelWarning={!resident.loaded || Object.keys(status.failed).length + Object.keys(status.scenery.failed).length > 0} /></GameBoundary>);
+  root.render(<GameBoundary><App modelWarning={!resident.loaded || Object.keys(status.failed).length + Object.keys(status.scenery.failed).length + Object.keys(status.supplied.failed).length > 0} /></GameBoundary>);
 });

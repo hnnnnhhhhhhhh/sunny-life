@@ -3,7 +3,7 @@ import { finishOnboarding,seedCoastalHome } from './helpers.js';
 
 async function boot(page) {
   await seedCoastalHome(page);
-  await page.goto('/');
+  await page.goto(process.env.CI?'/?quality=low':'/',{waitUntil:'domcontentloaded'});
   await expect(page.getByTestId('world-canvas')).toBeVisible();
   await expect(page.locator('.world-loading')).toHaveCount(0);
   await finishOnboarding(page);
@@ -58,6 +58,7 @@ test('an unavailable GLB falls back without preventing editing or corrupting sav
   await page.mouse.click(point.x, point.y);
   await expect.poll(() => page.evaluate(() => window.__sunny.state().game.home.furniture.length)).toBe(17);
   await expect(page.locator('.save-status')).toHaveText('已保存');
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('sunny-life.save.v1')).home.furniture.length)).toBe(17);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sunny-life.save.v1')));
   expect(saved.home.furniture).toHaveLength(17);
   expect(saved.home.furniture.at(-1).type).toBe('sofa');

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { avatarModel, box, disposeModel, furnitureModel, houseModel, material } from './models.js';
+import { avatarModel, box, disposeModel, furnitureModel, houseModel, material, residentMarkerModel } from './models.js';
 import { createRoom, DEFAULT_AVATAR, findPath, footprint, navigationGrid, snap, surfaceHeight, validatePlacement, validateWall } from './game.js';
 import { PLOT, roomFromPoints } from './architecture.js';
 import { blenderAssetStatus } from './model-assets.js';
@@ -270,7 +270,7 @@ export class World {
       this.worldRoot.add(this.player);
     }
     if (!this.marker) {
-      this.marker = new THREE.Mesh(new THREE.OctahedronGeometry(0.135), material('#69ac85', { roughness: 0.3, metalness: 0.1 }));
+      this.marker = residentMarkerModel();
       this.worldRoot.add(this.marker);
     }
     if (state.draft !== old?.draft || !this.studioAvatar) {
@@ -687,7 +687,12 @@ export class World {
       mesh.traverse(node => {
         if (node.isMesh && node.material?.name.startsWith('Dye_Main_')) dyes.push(node.material.color.getHexString());
       });
-      return { id, source: mesh.userData.source || 'procedural', type: mesh.userData.type, dyes };
+      const parts={};
+      for(const name of ['TapHandle','SoapPump','FlushHandle','ToiletWater','ToiletBody']) {
+        const part=mesh.getObjectByName(name);
+        if(part)parts[name]={position:part.getWorldPosition(new THREE.Vector3()).toArray(),rotation:part.rotation.toArray().slice(0,3)};
+      }
+      return { id, source: mesh.userData.source || 'procedural', type: mesh.userData.type, dyes, parts };
     });
     const waterSamples = (pixels ? [[-6, 13.3], [7, 14], [18, -2]] : []).map(([x, z]) => {
       const screen = this.project(x, layout.waterHeight, z);
@@ -706,6 +711,7 @@ export class World {
       previewSource: this.preview?.userData.source || null,
       environment: { landmarks: this.environmentSystem.assets, waterTime: this.environmentSystem.waterTime(), waterSamples, grass: this.environmentSystem.grass.diagnostics(), ocean:this.environmentSystem.ocean.diagnostics() },
       resident: this.player?.userData.controller?.diagnostics() || null,
+      marker:{source:this.marker?.userData.source||'procedural',bounds:new THREE.Box3().setFromObject(this.marker).getSize(new THREE.Vector3()).toArray()},
       lighting:{time:this.lightState.time,phase:this.lightState.phase,sky:this.scene.background.getHexString(),
         sun:this.sun.intensity,ambient:this.hemi.intensity,lamps:this.lightState.lamps,fixtures:this.homeLighting?.diagnostics()},
       computers:[...this.items].filter(([,v])=>v.mesh.userData.computerPlayback)

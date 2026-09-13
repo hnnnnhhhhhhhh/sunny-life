@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { FLOOR_STYLES, WORLD_BLOCKS } from './game.js';
-import { createBlenderFurniture } from './model-assets.js';
+import { createBlenderFurniture, createSuppliedMarker } from './model-assets.js';
 import { allWalls, floorRegions, HOUSE_FLOOR, HOUSE_WINDOW as WINDOW, WALL_HEIGHT, wallAxis, wallOpenings, wallParts } from './architecture.js';
 import { createResidentModel } from './characters.js';
 import { createTelevision } from './activity-props.js';
@@ -314,6 +314,13 @@ export function furnitureModel(type, color) {
   }
   g.userData.type = type;
   return g;
+}
+
+export function residentMarkerModel() {
+  const supplied=createSuppliedMarker();
+  if(supplied)return supplied;
+  return new THREE.Mesh(geometry('resident-marker',()=>new THREE.OctahedronGeometry(.135)),
+    material('#69ac85',{roughness:.3,metalness:.1}));
 }
 
 export function avatarModel(avatar) {

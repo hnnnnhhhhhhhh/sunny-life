@@ -1,0 +1,23 @@
+{
+  "kitchen": {
+    "filename": "low_poly_kitchen_assets_-_the_sims_4_style.glb",
+    "sha256": "7ca8c06cecd7d43d23fce33422757f748cace030534c7bdcd6a2912900ea5e03",
+    "author": "Alex (littledica)",
+    "url": "https://sketchfab.com/3d-models/low-poly-kitchen-assets-the-sims-4-style-1b4df6f81f5d48bc81df0560734292d3",
+    "license": "CC-BY-4.0"
+  },
+  "toilet": {
+    "filename": "sims_3_bargain_john_cheap_toilet_left_flush.glb",
+    "sha256": "fa2f6f0d16db75e29cf6770546263c77131750edf1af29471e579984155c097d",
+    "author": "Yaiyeondurising (5Life)",
+    "url": "https://sketchfab.com/3d-models/sims-3-bargain-john-cheap-toilet-left-flush-8d799c7c87584ba2bf5bf032f82884d2",
+    "license": "CC-BY-SA-4.0"
+  },
+  "plumbob": {
+    "filename": "the_sims_plumbob.glb",
+    "sha256": "bef01ed9515ce26ec2269ca7389876f1b3754c3a140c69210e670ffc40de964b",
+    "author": "BenK (BenK656)",
+    "url": "https://sketchfab.com/3d-models/the-sims-plumbob-8dadd87ba9e049c596765857fff2f527",
+    "license": "CC-BY-4.0"
+  }
+}

@@ -198,6 +198,8 @@ export class ActivityRunner {
     }
     const toiletWater = world.items.get(action.targetId)?.mesh.getObjectByName('ToiletWater');
     if (toiletWater) toiletWater.scale.set(1, 1, 1.28);
+    const flushHandle=world.items.get(action.targetId)?.mesh.getObjectByName('FlushHandle');
+    if(flushHandle)flushHandle.rotation.x=0;
     if (action.televisionId) world.items.get(action.televisionId)?.mesh.userData.screenPlayback?.setPlaying(false);
     if (action.computerId) world.items.get(action.computerId)?.mesh.userData.computerPlayback?.setPlaying(false);
     if (action.npcId) {
@@ -291,6 +293,8 @@ export class ActivityRunner {
       if (action.type === 'toilet' && action.stage === 'standing') {
         const water = world.items.get(action.targetId)?.mesh.getObjectByName('ToiletWater');
         if (water) water.scale.setScalar(0.82 + Math.sin(action.elapsed * 18) * 0.12);
+        const handle=world.items.get(action.targetId)?.mesh.getObjectByName('FlushHandle');
+        if(handle)handle.rotation.x=-.4*Math.sin(Math.min(1,action.elapsed/.8)*Math.PI);
       }
       if (entering && action.elapsed >= duration) {
         action.stage = 'active'; action.elapsed = 0;
