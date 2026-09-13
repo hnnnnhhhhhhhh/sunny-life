@@ -4,22 +4,21 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { CCDIKSolver } from 'three/addons/animation/CCDIKSolver.js';
 import manifest from './assets/resident-manifest.json';
 import layout from './resident-layout.json' with { type:'json' };
+import {downloadAsset} from './asset-download.js';
 
 let residentAsset, loading, loadError;
 const materials = new Map();
 
-export function loadResidentAssets() {
+export function loadResidentAssets(onProgress) {
   if (loading) return loading;
   loading = (async () => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 60000);
     try {
       const compressed=manifest.compressedFile&&typeof DecompressionStream!=='undefined';
       const file=compressed?manifest.compressedFile:manifest.file;
       const hash=compressed?manifest.compressedSha256:manifest.sha256;
-      const response = await fetch(`${import.meta.env.BASE_URL}${file}?v=${hash.slice(0,12)}`, { signal: controller.signal,priority:'high' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      let buffer=await response.arrayBuffer();
+      let buffer=await downloadAsset(`${import.meta.env.BASE_URL}${file}?v=${hash.slice(0,12)}`,{
+        onProgress,expectedBytes:compressed?manifest.compressedBytes:manifest.bytes,decodedBytes:manifest.bytes,
+      });
       const signature=new Uint8Array(buffer,0,Math.min(2,buffer.byteLength));
       // HTTP Content-Encoding may already have been decoded by the browser.
       if(compressed&&signature[0]===0x1f&&signature[1]===0x8b)
@@ -32,8 +31,6 @@ export function loadResidentAssets() {
       residentAsset = null;
       loadError = error.message;
       console.warn('Resident model unavailable, using the basic character.', error.message);
-    } finally {
-      clearTimeout(timer);
     }
     return residentAssetStatus();
   })();

@@ -16,7 +16,15 @@ class GameBoundary extends React.Component {
 }
 
 const root = createRoot(document.getElementById('root'));
-root.render(<div className="world-loading" role="status"><strong>正在布置家园</strong></div>);
-Promise.all([loadResidentAssets(), loadBlenderModels()]).then(([resident,status]) => {
+root.render(<div className="world-loading" role="status"><strong>正在加载居民</strong></div>);
+let lastProgress=-1;
+loadResidentAssets((loaded,total)=>{
+  const progress=total?Math.min(99,Math.floor(loaded/total*100)):0;
+  if(progress===lastProgress)return;
+  lastProgress=progress;
+  root.render(<div className="world-loading" role="status"><strong>正在加载居民 · {progress}%</strong><progress aria-label="居民资源加载进度" max={100} value={progress} style={{width:200,maxWidth:'70%'}} /></div>);
+}).then(async resident => {
+  root.render(<div className="world-loading" role="status"><strong>正在布置家园</strong></div>);
+  const status=await loadBlenderModels();
   root.render(<GameBoundary><App modelWarning={!resident.loaded || Object.keys(status.failed).length + Object.keys(status.scenery.failed).length > 0} /></GameBoundary>);
 });
