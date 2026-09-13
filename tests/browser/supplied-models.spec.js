@@ -26,10 +26,15 @@ async function use(page,id,label) {
 
 for(const home of ['apartment','coast'])test(`replacement models preserve the ${home} save and actually render`,async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const requests=[];
+  page.on('request',request=>{
+    if(request.url().includes('/models/')&&!request.url().includes('/models/resident/'))requests.push(request.url());
+  });
   const game=home==='apartment'?newApartmentGame():newGame();
   const original=structuredClone(game.home),budget=game.budget;
   await boot(page,game);
   const d=await diag(page);
+  expect(requests[0]).toContain('/models/supplied/furnishings.glb');
   expect(d.assets.supplied.failed).toEqual({});
   expect(d.assets.supplied.loaded.sort()).toEqual(['fridge','kitchen','plumbob','sink','toilet']);
   for(const furniture of d.furniture.filter(f=>['kitchen','fridge','sink','toilet'].includes(f.type)))

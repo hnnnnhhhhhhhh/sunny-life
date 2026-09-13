@@ -46,11 +46,14 @@ export async function loadBlenderModels() {
       clearTimeout(timeout);
     }
   });
-  loading = Promise.all([
-    ...loadCollection(manifest, templates, failures),
-    ...loadCollection(worldManifest, worldTemplates, worldFailures),
-    loadSuppliedModels(loader),
-  ]).then(() => blenderAssetStatus());
+  loading = (async()=>{
+    await loadSuppliedModels(loader);
+    await Promise.all([
+      ...loadCollection(manifest, templates, failures),
+      ...loadCollection(worldManifest, worldTemplates, worldFailures),
+    ]);
+    return blenderAssetStatus();
+  })();
   return loading;
 }
 
@@ -61,6 +64,7 @@ async function loadSuppliedModels(loader) {
     const hash=compressed?suppliedManifest.compressedSha256:suppliedManifest.sha256;
     let buffer=await downloadAsset(`${import.meta.env.BASE_URL}${file}?v=${hash.slice(0,12)}`,{
       expectedBytes:compressed?suppliedManifest.compressedBytes:suppliedManifest.bytes,decodedBytes:suppliedManifest.bytes,
+      idleMs:30000,
     });
     const signature=new Uint8Array(buffer,0,Math.min(2,buffer.byteLength));
     if(compressed&&signature[0]===0x1f&&signature[1]===0x8b)
