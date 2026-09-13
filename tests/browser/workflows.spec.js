@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { finishOnboarding } from './helpers.js';
+import { finishOnboarding,seedCoastalHome } from './helpers.js';
 
 async function boot(page, editing = false, properties = false) {
+  await seedCoastalHome(page);
   await page.goto('/');
   await expect(page.getByTestId('world-canvas')).toBeVisible();
   await expect(page.locator('.world-loading')).toHaveCount(0);

@@ -6,6 +6,7 @@ import { allWalls, floorRegions, HOUSE_FLOOR, HOUSE_WINDOW as WINDOW, WALL_HEIGH
 import { createResidentModel } from './characters.js';
 import { createTelevision } from './activity-props.js';
 import { SINK_LAYOUT, sinkCenter } from './handwashing.js';
+import { isApartment } from './residence.js';
 
 const geometries = new Map(), materials = new Map();
 const geometry = (key, create) => {
@@ -419,7 +420,7 @@ export function houseModel(home, roof = false) {
       tile.userData.floorId = region.id;
       g.userData.floorSurfaces.push(tile);
     }
-    if (roof) {
+    if (roof && !isApartment(home)) {
       const shape = new THREE.Shape();
       shape.moveTo(-w / 2 - 0.3, 0); shape.lineTo(0, Math.min(2.2, w * 0.22)); shape.lineTo(w / 2 + 0.3, 0); shape.closePath();
       const geo = new THREE.ExtrudeGeometry(shape, { depth: d + 0.6, bevelEnabled: false });
@@ -454,7 +455,7 @@ export function houseModel(home, roof = false) {
     g.add(full, low);
     g.userData.wallGroups.push({ full, low, wall });
   }
-  if (home.foundation !== false) {
+  if (home.foundation !== false && !isApartment(home)) {
     box(g, 0, 0.08, home.depth / 2 + 0.46, 1.8, 0.17, 0.75, '#d9d0b6');
     const patioWidth = Math.min(3.25, 10.35 - home.width / 2);
     const patioX = home.width / 2 + patioWidth / 2 + 0.075;

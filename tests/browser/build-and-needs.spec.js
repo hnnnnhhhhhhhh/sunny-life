@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { newGame } from '../../src/game.js';
 import { finishOnboarding } from './helpers.js';
 
-async function boot(page, game) {
+async function boot(page, game = newGame()) {
   if (game) await page.addInitScript(game => localStorage.setItem('sunny-life.save.v1', JSON.stringify(game)), game);
   await page.goto('/');
   await expect(page.locator('.world-loading')).toHaveCount(0);

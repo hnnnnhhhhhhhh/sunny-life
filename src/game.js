@@ -1,6 +1,7 @@
 import PF from 'pathfinding';
 import { WORLD_COLLIDERS, restoreWorldPosition, terrainHeight, terrainSurface, terrainWalkable } from './terrain.js';
 import { allWalls, EXTERIOR_IDS, exteriorRecords, floorRegions, onFloor, PLOT, roomWalls, setWallOpening, sharedWall, wallAxis, wallColliders, wallParts } from './architecture.js';
+import { APARTMENT_COLLIDERS, apartmentPlaceable, apartmentWalkable, isApartment } from './residence.js';
 
 export const SAVE_KEY = 'sunny-life.save.v1';
 export const CATALOG = [
@@ -115,6 +116,47 @@ export function newGame(onboarding = true) {
   return game;
 }
 
+export function newApartmentGame(onboarding = true) {
+  const game=newGame(onboarding);
+  game.home={
+    name:'青禾公寓 · 301',residence:'apartment',width:12,depth:9,floor:'oak',wallColor:'#f3f1e8',
+    foundation:true,rooms:[],removedExterior:[],exteriorEdits:{},
+    walls:[
+      {id:'bathroom-east',x1:-2.5,z1:-4.5,x2:-2.5,z2:-1,kind:'door',opening:-1.9},
+      {id:'bathroom-south',x1:-6,z1:-1,x2:-2.5,z2:-1},
+      {id:'bedroom-divider',x1:1.5,z1:1,x2:1.5,z2:4.5},
+    ],
+    furniture:[
+      item('sofa-1','sofa',-3.4,.1),item('tv-1','tv',-3.35,3.85,Math.PI),
+      item('rug-1','rug',-3.4,2),item('coffee-1','coffee',-3.4,2.9),
+      item('lamp-1','lamp',-5.45,.1),item('shelf-1','shelf',-.85,-3.85),
+      item('bed-1','bed',3.9,2.5),item('nightstand-1','nightstand',2.05,3.85),
+      item('kitchen-1','kitchen',3.3,-3.85),item('dining-1','dining',3.2,-1.4),
+      item('fridge-1','fridge',.55,-3.9),
+      item('shower-1','shower',-5.05,-3.5),item('toilet-1','toilet',-3.3,-3.6),
+      item('sink-1','sink',-5.42,-1.9,Math.PI/2),
+      item('plant-1','plant',-5.3,5.5),item('planter-1','planter',3.7,5.65),
+    ],
+  };
+  const colors={sofa:'#5d8376',bed:'#c19796',kitchen:'#b5c5c1',tv:'#889fa3',rug:'#c6cebd'};
+  game.home.furniture=game.home.furniture.map(f=>({...f,color:colors[f.type]||f.color}));
+  game.sim={...game.sim,x:0,z:0};
+  return game;
+}
+
+export function switchResidence(game,residence) {
+  if(!['apartment','coastal'].includes(residence))return game;
+  if((isApartment(game.home)?'apartment':'coastal')===residence)return game;
+  const backup=game.residenceBackup;
+  const saved=backup&&(isApartment(backup.home)?'apartment':'coastal')===residence?backup:null;
+  const fresh=residence==='apartment'?newApartmentGame():newGame();
+  return {...game,home:saved?.home||fresh.home,budget:saved?.budget??fresh.budget,
+    sim:{...game.sim,x:saved?.x??fresh.sim.x,z:saved?.z??fresh.sim.z},
+    residenceBackup:{home:game.home,budget:game.budget,x:game.sim.x,z:game.sim.z}};
+}
+
+export const worldColliders = home => isApartment(home)?APARTMENT_COLLIDERS:WORLD_COLLIDERS;
+
 export function footprint(object) {
   const info = ITEM_MAP[object.type];
   const c = Math.abs(Math.cos(object.rotation || 0));
@@ -142,6 +184,7 @@ export function validatePlacement(home, object, ignoreId) {
   const info = ITEM_MAP[object.type];
   if (!info || !Number.isFinite(object.x) || !Number.isFinite(object.z)) return '无效的家具';
   const rect = { ...footprint(object), x: object.x, z: object.z };
+  if(isApartment(home)&&!apartmentPlaceable(rect))return '家具只能摆在套内或自家阳台，不能占用公共走廊';
   if (Math.abs(rect.x) + rect.width / 2 > 10.5 || Math.abs(rect.z) + rect.depth / 2 > 8.5) return '超出了自家地块';
   if (home.furniture.length >= 120 && !ignoreId) return '当前地块最多放置 120 件家具';
   if (home.furniture.some(other => {
@@ -149,7 +192,7 @@ export function validatePlacement(home, object, ignoreId) {
     return rectanglesOverlap(rect, { ...footprint(other), x: other.x, z: other.z });
   })) return '这里已经有家具了';
   if (!info.flat && wallColliders(home).some(w => rectanglesOverlap(rect, w))) return '家具不能穿过墙壁';
-  if (!info.flat && WORLD_COLLIDERS.some(block => rectanglesOverlap(rect, block))) return '这里有树木、岩石或围栏';
+  if (!info.flat && worldColliders(home).some(block => rectanglesOverlap(rect, block))) return '这里有固定建筑或围栏';
   return null;
 }
 
@@ -158,11 +201,12 @@ export function validateWall(home, wall) {
   if (!values.every(Number.isFinite)) return '无效的墙体';
   if (wall.x1 !== wall.x2 && wall.z1 !== wall.z2) return '墙体需要沿网格放置';
   if (Math.hypot(wall.x1 - wall.x2, wall.z1 - wall.z2) < 0.5) return '墙体至少需要一格长度';
+  if(isApartment(home)&&values.some((v,i)=>Math.abs(v)>(i<2?6:4.5)))return '隔墙只能建在公寓套内';
   if (Math.max(Math.abs(wall.x1), Math.abs(wall.x2)) > PLOT.x ||
       Math.max(Math.abs(wall.z1), Math.abs(wall.z2)) > PLOT.z) return '请在自家地块内建墙';
   const rect = wallBounds(wall);
   if (home.furniture.some(f => !ITEM_MAP[f.type].flat && rectanglesOverlap(rect, { ...footprint(f), x: f.x, z: f.z }))) return '这里的家具挡住了墙体';
-  if (WORLD_COLLIDERS.some(block => rectanglesOverlap(rect, block))) return '这里有树木、岩石或围栏';
+  if (worldColliders(home).some(block => rectanglesOverlap(rect, block))) return '这里有固定建筑或围栏';
   const axis = wallAxis(wall);
   if (allWalls(home).some(w => {
     const other = wallAxis(w);
@@ -173,6 +217,7 @@ export function validateWall(home, wall) {
 }
 
 export function createRoom(home, room) {
+  if(isApartment(home))return {error:'公寓可调整套内隔墙，不能向楼外扩建'};
   if (![room.x1, room.x2, room.z1, room.z2].every(Number.isFinite)) return { error: '无效的房间' };
   const width = room.x2 - room.x1, depth = room.z2 - room.z1;
   if (width < 2 || depth < 2) return { error: '房间至少需要 2 × 2 米' };
@@ -194,6 +239,7 @@ export function createRoom(home, room) {
 }
 
 export function bathroomAddition(home) {
+  if(isApartment(home))return {error:'公寓已有卫浴区，可从目录调整卫浴设施'};
   if ((home.rooms || []).some(r => r.id === 'bathroom')) return { error: '已经有卫浴间了' };
   const result = createRoom(home, { id: 'bathroom', x1: -10, z1: -2, x2: -6, z2: 2 });
   if (result.error) return result;
@@ -212,6 +258,7 @@ export function bathroomAddition(home) {
 }
 
 export function validateResize(home, width, depth) {
+  if(isApartment(home))return '公寓外轮廓固定，可装修内部隔墙与家具';
   if (!Number.isFinite(width) || !Number.isFinite(depth) || width < 10 || width > 16 || depth < 8 || depth > 14) return '房屋尺寸超出地块范围';
   const next = { ...home, width, depth };
   const wasInside = f => Math.abs(f.x) < home.width / 2 && Math.abs(f.z) < home.depth / 2;
@@ -244,6 +291,13 @@ export function validateSave(data) {
   if (!data || data.version !== 1 || !data.home || !data.avatar || !data.sim) return false;
   const { home, avatar, sim } = data;
   return typeof home.name === 'string' && home.name.length <= 40 &&
+    (home.residence===undefined||['coastal','apartment'].includes(home.residence)) &&
+    (!isApartment(home)||(home.width===12&&home.depth===9&&home.foundation!==false&&
+      !home.rooms?.length&&!home.removedExterior?.length&&!Object.keys(home.exteriorEdits||{}).length)) &&
+    (data.residenceBackup===undefined||(data.residenceBackup&&
+      isApartment(data.residenceBackup.home)!==isApartment(home)&&
+      validateSave({...data,residenceBackup:undefined,home:data.residenceBackup.home,budget:data.residenceBackup.budget,
+        sim:{...sim,x:data.residenceBackup.x,z:data.residenceBackup.z}}))) &&
     (data.onboarding === undefined || typeof data.onboarding === 'boolean') &&
     finiteBetween(home.width, 10, 16) && finiteBetween(home.depth, 8, 14) &&
     FLOOR_STYLES.some(f => f.id === home.floor) && isColor(home.wallColor) &&
@@ -256,12 +310,14 @@ export function validateSave(data) {
     Array.isArray(home.furniture) && home.furniture.length <= 120 &&
     home.furniture.every(f => f && typeof f.id === 'string' && Object.hasOwn(ITEM_MAP, f.type) &&
       finiteBetween(f.x, -11, 11) && finiteBetween(f.z, -9, 9) &&
-      finiteBetween(f.rotation, -1000, 1000) && isColor(f.color)) &&
+      finiteBetween(f.rotation, -1000, 1000) && isColor(f.color) &&
+      (!isApartment(home)||apartmentPlaceable({...f,...footprint(f)}))) &&
     new Set(home.furniture.map(f => f.id)).size === home.furniture.length &&
     Array.isArray(home.walls) && home.walls.length <= 160 &&
     home.walls.every(w => w && typeof w.id === 'string' && !EXTERIOR_IDS.includes(w.id) && [w.x1, w.x2].every(n => finiteBetween(n, -PLOT.x, PLOT.x)) &&
       [w.z1, w.z2].every(n => finiteBetween(n, -PLOT.z, PLOT.z)) && (w.x1 === w.x2 || w.z1 === w.z2) &&
       Math.hypot(w.x2 - w.x1, w.z2 - w.z1) >= 0.5 && validOpening(w) && openingFits(w) &&
+      (!isApartment(home)||Math.max(Math.abs(w.x1),Math.abs(w.x2))<=6&&Math.max(Math.abs(w.z1),Math.abs(w.z2))<=4.5) &&
       (w.roomId === undefined || home.rooms?.some(r => r.id === w.roomId)) &&
       (w.price === undefined || finiteBetween(w.price, 0, 2000))) &&
     new Set(home.walls.map(w => w.id)).size === home.walls.length &&
@@ -283,23 +339,25 @@ export function validateSave(data) {
 }
 
 export function migrateGame(data) {
-  return restoreWorldPosition({
+  const next={
     ...data,
     onboarding: data.onboarding ?? true,
     home: { ...data.home, foundation: data.home.foundation ?? true, rooms: data.home.rooms || [],
       removedExterior: data.home.removedExterior || [], exteriorEdits: data.home.exteriorEdits || {} },
     sim: { ...data.sim, autonomy: data.sim.autonomy ?? true, catches:data.sim.catches || [], needs: { ...NEED_DEFAULTS, ...data.sim.needs } },
-  });
+  };
+  return isApartment(next.home)?apartmentWalkable(next.sim.x,next.sim.z)?next:
+    {...next,sim:{...next.sim,x:0,z:0}}:restoreWorldPosition(next);
 }
 
 export function loadGame(storage) {
   try {
     const raw = storage.getItem(SAVE_KEY);
-    if (!raw) return { data: newGame(false), recovered: false };
+    if (!raw) return { data: newApartmentGame(false), recovered: false };
     const data = JSON.parse(raw);
-    return validateSave(data) ? { data: migrateGame(data), recovered: false } : { data: newGame(false), recovered: true };
+    return validateSave(data) ? { data: migrateGame(data), recovered: false } : { data: newApartmentGame(false), recovered: true };
   } catch {
-    return { data: newGame(false), recovered: true };
+    return { data: newApartmentGame(false), recovered: true };
   }
 }
 
@@ -331,14 +389,18 @@ export function navigationGrid(home) {
       terrainTemplate.setWalkableAt(x, z, terrainWalkable(worldOf(x), worldOf(z)));
     }
   }
-  const grid = terrainTemplate.clone();
+  const grid = isApartment(home)?new PF.Grid(NAV_SIZE,NAV_SIZE):terrainTemplate.clone();
+  if(isApartment(home))for(let z=0;z<NAV_SIZE;z++)for(let x=0;x<NAV_SIZE;x++)
+    grid.setWalkableAt(x,z,apartmentWalkable(worldOf(x),worldOf(z),.17));
   const blocks = [
-    ...wallColliders(home), ...WORLD_COLLIDERS,
+    ...wallColliders(home), ...worldColliders(home),
     ...home.furniture.filter(f => !ITEM_MAP[f.type].flat).map(f => ({ ...footprint(f), x: f.x, z: f.z })),
   ];
   for (const b of blocks) {
-    const x0 = indexOf(b.x - b.width / 2 - 0.17), x1 = indexOf(b.x + b.width / 2 + 0.17);
-    const z0 = indexOf(b.z - b.depth / 2 - 0.17), z1 = indexOf(b.z + b.depth / 2 + 0.17);
+    const low=n=>isApartment(home)?Math.ceil((n+NAV_HALF)/NAV_STEP):indexOf(n);
+    const high=n=>isApartment(home)?Math.floor((n+NAV_HALF)/NAV_STEP):indexOf(n);
+    const x0 = low(b.x - b.width / 2 - 0.17), x1 = high(b.x + b.width / 2 + 0.17);
+    const z0 = low(b.z - b.depth / 2 - 0.17), z1 = high(b.z + b.depth / 2 + 0.17);
     for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) grid.setWalkableAt(x, z, false);
   }
   return grid;
@@ -360,7 +422,8 @@ function nearestFree(grid, x, z, radius = 6) {
 }
 
 export function findPath(home, from, to, cachedGrid) {
-  if (Math.abs(to.x) > 38 || Math.abs(to.z) > 38 || terrainSurface(to.x, to.z).kind === 'water') return [];
+  if (Math.abs(to.x) > 38 || Math.abs(to.z) > 38 ||
+    (isApartment(home)?!apartmentWalkable(to.x,to.z):terrainSurface(to.x,to.z).kind==='water')) return [];
   const grid = cachedGrid || navigationGrid(home);
   const start = nearestFree(grid, from.x, from.z);
   if (!start) return [];
@@ -384,6 +447,7 @@ export function findPath(home, from, to, cachedGrid) {
 }
 
 export function surfaceHeight(home, x, z) {
+  if(isApartment(home))return .25;
   return onFloor(home, x, z) ? 0.25 : terrainHeight(x, z) + 0.04;
 }
 

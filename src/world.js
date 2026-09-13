@@ -10,6 +10,8 @@ import { ActivityRunner } from './activity-runner.js';
 import { Autonomy } from './autonomy.js';
 import { ActionQueue } from './action-queue.js';
 import residentLayout from './resident-layout.json' with { type:'json' };
+import { apartmentWalkable, isApartment } from './residence.js';
+import { createApartmentEnvironment, createApartmentGrid, dressApartment } from './apartment-models.js';
 
 export class World {
   constructor(container, emit) {
@@ -116,7 +118,7 @@ export class World {
       const mesh = avatarModel({ ...DEFAULT_AVATAR, ...data, height: 0.88 });
       mesh.position.set(data.x, terrainHeight(data.x, data.z) + 0.04, data.z); mesh.rotation.y = i + 1;
       mesh.traverse(child => { child.userData.npcName = data.name; child.userData.npcId = id; });
-      this.npcRoot.add(mesh); return { id, mesh, data, phase: i * 2, busy: false };
+      this.npcRoot.add(mesh); return { id, mesh, data, coastalPosition:{x:data.x,z:data.z}, phase: i * 2, busy: false };
     });
     this.emitNeighbors();
     this.pointerDown = event => {
@@ -166,7 +168,8 @@ export class World {
   updateProjection() {
     const studio = this.state?.mode === 'avatar';
     const mobile = this.width < 760;
-    const span = studio ? (mobile ? 7 : 4.6) : mobile ? Math.max(43, 23 / (this.width / this.height)) : 34;
+    const apartment=isApartment(this.state?.game.home);
+    const span = studio ? (mobile ? 7 : 4.6) : mobile ? apartment?Math.max(28,18/(this.width/this.height)):Math.max(43,23/(this.width/this.height)) : 34;
     const aspect = this.width / this.height;
     if (this.camera.isOrthographicCamera) {
       this.camera.left = -span * aspect / 2; this.camera.right = span * aspect / 2;
@@ -184,6 +187,7 @@ export class World {
     this.state = state;
     const { game, mode, selected, pending, roof } = state;
     const { home, avatar } = game;
+    const apartment=isApartment(home),residenceChanged=apartment!==isApartment(old?.game.home);
     if(state.lowQuality!==old?.lowQuality) {
       this.renderer.setPixelRatio(state.lowQuality?0.5:Math.min(window.devicePixelRatio,1.75));
       this.renderer.shadowMap.enabled=!state.lowQuality;
@@ -199,10 +203,30 @@ export class World {
       this.activities.cancel(true, undefined, true);
     }
     if (old && (mode !== old.mode || state.loadVersion !== old.loadVersion)) this.queue.clear();
-    const houseKey = JSON.stringify([home.width, home.depth, home.foundation, home.rooms, home.removedExterior, home.exteriorEdits, home.floor, home.wallColor, home.walls, roof]);
+    if(apartment&&!this.apartmentSystem) {
+      this.apartmentSystem=createApartmentEnvironment();
+      this.scene.add(this.apartmentSystem.root);
+      this.apartmentGrid=createApartmentGrid();
+      this.worldRoot.add(this.apartmentGrid);
+    }
+    if(residenceChanged||!old) {
+      (apartment?this.worldRoot:this.environment).add(this.npcRoot);
+      this.npcs.forEach((npc,i)=>{
+        Object.assign(npc.data,apartment?{x:7.25,z:[-2.6,2.6,.6][i]}:npc.coastalPosition);
+        npc.mesh.position.set(npc.data.x,apartment?.25:terrainHeight(npc.data.x,npc.data.z)+.04,npc.data.z);
+        npc.busy=false;
+      });
+    }
+    this.environment.visible=mode!=='avatar'&&!apartment;
+    if(this.apartmentSystem) {
+      this.apartmentSystem.root.visible=mode!=='avatar'&&apartment;
+      this.apartmentSystem.setExterior(!!state.apartmentExterior&&mode!=='build');
+    }
+    const houseKey = JSON.stringify([home.residence,home.width, home.depth, home.foundation, home.rooms, home.removedExterior, home.exteriorEdits, home.floor, home.wallColor, home.walls, roof]);
     if (houseKey !== this.houseKey) {
       if (this.house) { this.worldRoot.remove(this.house); disposeModel(this.house); }
       this.house = houseModel(home, roof);
+      if(apartment)dressApartment(this.house,home);
       this.worldRoot.add(this.house);
       this.houseKey = houseKey;
     }
@@ -250,7 +274,8 @@ export class World {
       this.studioAvatar.rotation.y = 0.15;
       this.studio.add(this.studioAvatar);
     }
-    this.grid.visible = mode === 'build' && state.showGrid && !roof;
+    this.grid.visible = mode === 'build' && state.showGrid && !roof && !apartment;
+    if(this.apartmentGrid)this.apartmentGrid.visible=mode==='build'&&state.showGrid&&apartment;
     this.selection.visible = !!selected && mode === 'build' && !pending;
     if (this.selection.visible) {
       const object = home.furniture.find(f => f.id === selected);
@@ -284,10 +309,10 @@ export class World {
     const drawing = mode === 'build' && ['wall', 'room'].includes(state.tool);
     this.controls.mouseButtons.LEFT = drawing ? null : THREE.MOUSE.ROTATE;
     this.controls.touches.ONE = drawing ? null : THREE.TOUCH.ROTATE;
-    if (mode !== old?.mode) {
+    if (mode !== old?.mode || residenceChanged) {
       this.path = []; this.destination.visible = false;
       const studio = mode === 'avatar';
-      this.environment.visible = !studio; this.worldRoot.visible = !studio; this.studio.visible = studio;
+      this.environment.visible = !studio&&!apartment; this.worldRoot.visible = !studio; this.studio.visible = studio;
       this.scene.background.set(studio ? '#e5e9df' : '#c4d7d3');
       this.controls.maxZoom = studio ? 3.5 : mode === 'live' ? 4 : 2.6;
       this.controls.minZoom = studio ? 0.75 : 0.4;
@@ -298,6 +323,7 @@ export class World {
         position: studio ? new THREE.Vector3(3.2, 2.65, 7) : new THREE.Vector3(21, 26, 30),
         zoom: 1,
       };
+      if(apartment&&!studio)this.command(state.apartmentExterior?'apartmentExterior':'home');
       this.updateProjection();
     }
     if (state.evening !== old?.evening) {
@@ -375,6 +401,9 @@ export class World {
     if (!this.setRay(event)) return;
     const x = snap(this.intersection.x), z = snap(this.intersection.z);
     const { mode, tool, pending, game } = this.state;
+    if(isApartment(game.home)&&this.state.apartmentExterior&&mode==='live') {
+      this.emit({type:'apartmentView',exterior:false});this.command('home');return;
+    }
     if (mode === 'build' && pending) {
       const error = validatePlacement(game.home, { ...pending, x, z }, pending.movingId);
       this.emit(error ? { type: 'toast', message: error } : { type: 'place', x, z });
@@ -399,9 +428,11 @@ export class World {
       else if (npcHit) this.startChat(npcHit.object.userData.npcId);
       else {
         this.emit({ type: 'dismissInteraction' });
-        const surface = this.raycaster.intersectObjects([...this.house.userData.floorSurfaces, ...this.environmentSystem.surfaces, this.environmentSystem.water], false)[0];
+        const apartment=isApartment(game.home);
+        const surfaces=apartment?this.apartmentSystem.surfaces:[...this.environmentSystem.surfaces,this.environmentSystem.water];
+        const surface = this.raycaster.intersectObjects([...this.house.userData.floorSurfaces,...surfaces],false)[0];
         if (surface && surface.object !== this.environmentSystem.water) this.walkTo({ x: surface.point.x, z: surface.point.z });
-        else this.emit({ type: 'toast', message: '河面不能步行，请沿木桥通行' });
+        else this.emit({ type: 'toast', message: apartment?'请选择套内、阳台或公共走廊':'河面不能步行，请沿木桥通行' });
       }
     }
   }
@@ -411,6 +442,7 @@ export class World {
   }
 
   navigateTo(target) {
+    if(isApartment(this.state.game.home)&&!apartmentWalkable(target.x,target.z))return false;
     if (terrainSurface(target.x, target.z).kind === 'water') {
       this.emit({ type: 'toast', message: '河面不能步行，请沿木桥通行' });
       return false;
@@ -434,7 +466,10 @@ export class World {
     return this.queue.add({ kind:'chat',targetId:id });
   }
 
-  startFishing(id) { return this.queue.add({ kind:'fish',targetId:id }); }
+  startFishing(id) {
+    if(isApartment(this.state.game.home)){this.emit({type:'toast',message:'钓鱼可在海岸住宅进行'});return false;}
+    return this.queue.add({ kind:'fish',targetId:id });
+  }
 
   emitNeighbors() {
     this.emit({ type: 'neighbors', neighbors: this.npcs.map(npc => ({ id: npc.id, name: npc.data.name, busy: npc.busy })) });
@@ -447,6 +482,16 @@ export class World {
   }
 
   command(action, place) {
+    const apartment=isApartment(this.state?.game.home);
+    if(apartment&&['home','follow','dining','activity','television'].includes(action))this.emit({type:'apartmentView',exterior:false});
+    if(apartment&&action==='apartmentExterior') {
+      this.cameraTransition={position:new THREE.Vector3(24,16,32),target:new THREE.Vector3(0,-1.8,0),zoom:this.width<760?.8:1.3};
+      return;
+    }
+    if(apartment&&action==='home') {
+      this.cameraTransition={position:new THREE.Vector3(17,22,26),target:new THREE.Vector3(.5,.9,.7),zoom:this.width<760?1.1:1.9};
+      return;
+    }
     if (action === 'home') {
       this.cameraTransition = { position: new THREE.Vector3(21, 26, 30), target: new THREE.Vector3(1.4, 0, 0), zoom: 1 };
     } else if (action === 'zoomIn' || action === 'zoomOut') {
@@ -506,7 +551,7 @@ export class World {
     this.frame = requestAnimationFrame(t => this.animate(t));
     const dt = Math.min((time - this.lastTime) / 1000, 0.25);
     this.lastTime = time;
-    this.environmentSystem.update(time);
+    if(!isApartment(this.state?.game.home))this.environmentSystem.update(time);
     if (this.cameraTransition) {
       const t = this.cameraTransition;
       const blend=1-Math.exp(-7*dt);
@@ -568,9 +613,11 @@ export class World {
         }
         npc.phase += dt * 0.12 * speed;
         const t = npc.phase;
-        mesh.position.x = data.x + Math.sin(t) * 1.3;
-        mesh.position.y = terrainHeight(mesh.position.x, mesh.position.z) + 0.04;
-        mesh.rotation.y = Math.cos(t) > 0 ? Math.PI / 2 : -Math.PI / 2;
+        const apartment=isApartment(game.home);
+        mesh.position.x = data.x + (apartment?0:Math.sin(t)*1.3);
+        if(apartment)mesh.position.z=data.z+Math.sin(t)*.35;
+        mesh.position.y = apartment?.25:terrainHeight(mesh.position.x, mesh.position.z) + 0.04;
+        mesh.rotation.y = apartment?(Math.cos(t)>0?0:Math.PI):(Math.cos(t)>0?Math.PI/2:-Math.PI/2);
         if (mesh.userData.controller) {
           mesh.userData.controller.play('Walk');
           mesh.userData.controller.update(dt * speed * 0.55);
@@ -587,7 +634,8 @@ export class World {
       const active = this.activities.current;
       const focus = active && active.stage !== 'approach' ? this.player.position : this.controls.target;
       const inFront = wall.x1 === wall.x2 ? (wall.x1 - focus.x) * dx > 0.01 : (wall.z1 - focus.z) * dz > 0.01;
-      const cut = !this.state.roof && this.state.cutaway !== false && inFront;
+      const exterior=isApartment(this.state.game.home)&&this.state.apartmentExterior;
+      const cut = !this.state.roof && !exterior && this.state.cutaway !== false && inFront;
       full.visible = !cut; low.visible = cut;
     }
     this.renderer.render(this.scene, this.camera);
@@ -626,6 +674,7 @@ export class World {
       camera: { type: this.camera.type, position: this.camera.position.toArray(), target: this.controls.target.toArray(), polar: this.controls.getPolarAngle(), azimuth: this.controls.getAzimuthalAngle() },
       walls: this.house.userData.wallGroups.map(({ wall, full }) => ({ id: wall.id, full: full.visible })),
       assets: blenderAssetStatus(), furniture,
+      residence:isApartment(this.state.game.home)?this.apartmentSystem.diagnostics():{style:'coastal'},
       previewSource: this.preview?.userData.source || null,
       environment: { landmarks: this.environmentSystem.assets, waterTime: this.environmentSystem.waterTime(), waterSamples, grass: this.environmentSystem.grass.diagnostics(), ocean:this.environmentSystem.ocean.diagnostics() },
       resident: this.player?.userData.controller?.diagnostics() || null,
@@ -687,10 +736,11 @@ export class World {
     this.studioAvatar?.userData.controller?.dispose();
     this.npcs.forEach(({ mesh }) => mesh.userData.controller?.dispose());
     disposeModel(this.environment);
+    if(this.apartmentSystem){disposeModel(this.apartmentSystem.root);this.apartmentSystem.dispose();}
     this.environmentSystem.ocean.dispose();
     disposeModel(this.furnitureRoot);
     this.scene.traverse(object => { if (object.userData.disposable) object.geometry?.dispose(); });
-    for (const object of [this.grid, this.selection, this.hoverOutline, this.destination]) {
+    for (const object of [this.grid, this.apartmentGrid, this.selection, this.hoverOutline, this.destination].filter(Boolean)) {
       object.geometry.dispose(); object.material.dispose();
     }
     this.renderer.dispose();

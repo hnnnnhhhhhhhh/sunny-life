@@ -7,12 +7,12 @@ import {
   Palette, Pause, Play, Plus, Redo2, RotateCw, Save, Scissors,
   Search, Settings2, Shirt, Shuffle, Smile, Sofa, Sparkles, Sprout, Sun,
   Trash2, Undo2, Utensils, UtensilsCrossed, X, Zap, ZoomIn, ZoomOut,
-  Bath, Camera, ChevronUp, DoorOpen, Scan, Square, RotateCcw, Toilet, ShowerHead, Box as BoxIcon, Fish, FishSymbol, Gauge, Droplets,
+  Bath, Camera, ChevronUp, DoorOpen, Scan, Square, RotateCcw, Toilet, ShowerHead, Box as BoxIcon, Fish, FishSymbol, Gauge, Droplets, Building2, ArrowLeftRight,
 } from 'lucide-react';
 import {
   ACTIVITIES, CATALOG, CLOTHES_COLORS, FLOOR_STYLES, HAIR_COLORS,
   ITEM_MAP, activityTypes, SKIN_COLORS, TRAITS, WALL_COLORS, loadGame, newGame, saveGame, uid,
-  validatePlacement, validateResize, validateSave, validateWall, createRoom, bathroomAddition, migrateGame, advanceSim, GAME_MINUTES_PER_SECOND,
+  validatePlacement, validateResize, validateSave, validateWall, createRoom, bathroomAddition, migrateGame, advanceSim, GAME_MINUTES_PER_SECOND, newApartmentGame, switchResidence,
 } from './game.js';
 import { allWalls, floorRegions, removeWall, setWallOpening, wallParts } from './architecture.js';
 import { avatarModel, furnitureModel, modelPreview } from './models.js';
@@ -21,6 +21,7 @@ import { LANDMARKS, layout } from './terrain.js';
 import { MEALS } from './interactions.js';
 import { ResidentPanel, TimeControls } from './Hud.jsx';
 import { FISH, FISHING_SPOTS } from './fishing.js';
+import { isApartment } from './residence.js';
 
 const formatMoney = n => new Intl.NumberFormat('en-US').format(n);
 
@@ -130,10 +131,12 @@ function Modal({ title, onClose, children, wide = false }) {
 export default function App({ modelWarning = false }) {
   const [state, dispatch] = useReducer(reducer, null, () => {
     let loaded;
-    try { loaded = loadGame(window.localStorage); } catch { loaded = { data: newGame(false), recovered: true }; }
+    try { loaded = loadGame(window.localStorage); } catch { loaded = { data: newApartmentGame(false), recovered: true }; }
     return { game: loaded.data, past: [], future: [], loadVersion: 0, recovered: loaded.recovered };
   });
   const { game } = state;
+  const apartment=isApartment(game.home);
+  const [apartmentExterior,setApartmentExterior]=useState(false);
   const [mode, setMode] = useState(game.onboarding ? 'live' : 'avatar');
   const onboarding = game.onboarding === false;
   const [tool, setTool] = useState('select');
@@ -167,7 +170,7 @@ export default function App({ modelWarning = false }) {
   const [mobilePanel, setMobilePanel] = useState(false);
   const worldNode = useRef(null), world = useRef(null), eventHandler = useRef(null);
   const latest = useRef(null), toastTimer = useRef(null), catalogue = useRef(null), fileInput = useRef(null);
-  latest.current = { ...state, mode, tool, selected, pending, roof, cutaway, lowQuality, showGrid, speed, draft, wallStart, evening, activity, propertiesOpen: mobilePanel, catalogOpen };
+  latest.current = { ...state, mode, tool, selected, pending, roof, cutaway, lowQuality, showGrid, speed, draft, wallStart, evening, activity, apartmentExterior, propertiesOpen: mobilePanel, catalogOpen };
   const selectedObject = game.home.furniture.find(f => f.id === selected);
   const selectedInfo = selectedObject && ITEM_MAP[selectedObject.type];
   const filtered = useMemo(() => CATALOG.filter(item => (category === 'all' || item.category === category) && `${item.name}${item.detail}`.includes(search.trim())), [category, search]);
@@ -236,7 +239,19 @@ export default function App({ modelWarning = false }) {
     cancelPlacement(); setSelected(null); setInteraction(null); setActivity(null); setWalking(false);
     if (next === 'avatar') setDraft(game.avatar);
     setMode(next); setTool('select'); setMobilePanel(false);
-    if (next === 'build') { setRoof(false); setCatalogOpen(true); }
+    if (next === 'build') { setRoof(false); setApartmentExterior(false); setCatalogOpen(true); }
+  }
+  function showApartment(exterior) {
+    setApartmentExterior(exterior);setRoof(false);setInteraction(null);
+    world.current?.command(exterior?'apartmentExterior':'home');
+  }
+  function moveHome() {
+    world.current?.activities.cancel(true);
+    const next=migrateGame(switchResidence(latest.current.game,apartment?'coastal':'apartment'));
+    dispatch({type:'load',value:next});setDraft(next.avatar);
+    cancelPlacement();setSelected(null);setInteraction(null);setActivity(null);
+    setApartmentExterior(false);setRoof(false);setMode('live');setModal(null);setMobilePanel(false);
+    notify(`已搬入${next.home.name}，原住宅已保留`);
   }
   function beginPlace(item) {
     if (game.budget < item.price) return notify('生活币不足，先收回一些闲置家具吧');
@@ -286,8 +301,8 @@ export default function App({ modelWarning = false }) {
   function clearLot() {
     const refund = game.home.furniture.reduce((sum, f) => sum + ITEM_MAP[f.type].price, 0) +
       game.home.walls.reduce((sum, w) => sum + (w.price || 0), 0) + (game.home.rooms || []).reduce((sum, r) => sum + (r.price || 0), 0);
-    edit(g => ({ ...g, budget: Math.min(1000000, g.budget + refund), home: { ...g.home, foundation: false, rooms: [], walls: [], furniture: [], removedExterior: [], exteriorEdits: {} } }));
-    cancelPlacement(); setSelected(null); setModal(null); setMobilePanel(false); changeTool('room');
+    edit(g => ({ ...g, budget: Math.min(1000000, g.budget + refund), home: { ...g.home, foundation: isApartment(g.home), rooms: [], walls: [], furniture: [], removedExterior: [], exteriorEdits: {} } }));
+    cancelPlacement(); setSelected(null); setModal(null); setMobilePanel(false); changeTool(apartment?'wall':'room');
     notify('地块已清空，家具与建材已收回');
   }
 
@@ -302,6 +317,7 @@ export default function App({ modelWarning = false }) {
       dispatch({ type:'fishCaught',fish:event.fish }); notify(`钓到了${event.fish.name}`);
     }
     if (event.type === 'projection') setPerspective(event.perspective);
+    if (event.type === 'apartmentView') setApartmentExterior(event.exterior);
     if (event.type === 'select') { setSelected(event.id); if (event.id) setMobilePanel(true); }
     if (event.type === 'move') moveFurniture(event.id);
     if (event.type === 'remove') removeFurniture(event.id);
@@ -331,10 +347,12 @@ export default function App({ modelWarning = false }) {
     if (event.type === 'removeWall') {
       const target = allWalls(current.game.home).find(w => w.id === event.id);
       if (!target) return;
+      if(target.locked)return notify('公寓外墙与楼板不可拆除，套内隔墙可编辑');
       edit(g => ({ ...g, budget: g.budget + (target.price || 0), home: removeWall(g.home, event.id) }));
       notify('墙体已拆除');
     }
     if (event.type === 'removeFloor') {
+      if(isApartment(current.game.home))return notify('公寓楼板与公共走廊不可拆除');
       if (event.id === 'foundation') {
         return notify('主屋地基请在房屋属性中清空建筑');
       } else {
@@ -416,7 +434,7 @@ export default function App({ modelWarning = false }) {
     setSpeed(value => value || 1);
     setTimeout(() => {
       world.current?.walkTo({ x: place.x, z: place.z });
-      if (place.id === 'home') world.current?.command('home');
+      if (place.id === 'home'||apartment) world.current?.command('home');
       else world.current?.command('landmark', place);
     }, 80);
   }
@@ -453,7 +471,7 @@ export default function App({ modelWarning = false }) {
     bottom: 'auto', transform: 'none',
   } : undefined;
 
-  return <main className={`game-shell compact-hud mode-${mode} ${catalogOpen ? '' : 'catalog-collapsed'}`}>
+  return <main className={`game-shell compact-hud mode-${mode} ${apartment?'residence-apartment':''} ${catalogOpen ? '' : 'catalog-collapsed'}`}>
     <div ref={worldNode} className="world-viewport" />
     {!ready && <div className="world-loading"><Sun size={38} /><strong>{worldError || '青禾镇的阳光，准备好了'}</strong>{worldError && <button className="primary-button" onClick={() => window.location.reload()}>重新加载</button>}</div>}
 
@@ -468,14 +486,14 @@ export default function App({ modelWarning = false }) {
     </nav>}
 
     {mode !== 'avatar' && <>
-      <button className="location-label" aria-label="浏览青禾镇" title="青禾镇地图" onClick={() => setModal('map')}><span className="location-dot" /><span>{mode === 'live' ? '青禾镇' : game.home.name}</span><span className="location-separator">/</span><span className="floor-label">{mode === 'live' ? '地图' : '1F'}</span><ChevronDown size={12} /></button>
+      <button className="location-label" aria-label={apartment?'浏览公寓户型':'浏览青禾镇'} title={apartment?'公寓户型':'青禾镇地图'} onClick={() => setModal('map')}><span className="location-dot" /><span>{apartment?game.home.name:mode === 'live' ? '青禾镇' : game.home.name}</span><span className="location-separator">/</span><span className="floor-label">{apartment?'3F':mode === 'live' ? '地图' : '1F'}</span><ChevronDown size={12} /></button>
       <div className="left-rail">
         {mode === 'build' ? <>
           <div className="tool-group">
             <IconButton icon={MousePointer2} label="选择家具" active={tool === 'select'} onClick={() => changeTool('select')} />
             <IconButton icon={Move} label="移动家具" active={tool === 'move'} onClick={() => changeTool('move')} />
             <IconButton icon={BrickWall} label="建造墙体" active={tool === 'wall'} onClick={() => changeTool('wall')} />
-            <IconButton icon={Square} label="建造房间" active={tool === 'room'} onClick={() => changeTool('room')} />
+            {!apartment&&<IconButton icon={Square} label="建造房间" active={tool === 'room'} onClick={() => changeTool('room')} />}
             <IconButton icon={DoorOpen} label="安装门洞" active={tool === 'door'} onClick={() => changeTool('door')} />
             <IconButton icon={Grid2X2} label="安装窗户" active={tool === 'window'} onClick={() => changeTool('window')} />
             <IconButton icon={PaintRoller} label="墙面与地板" active={tool === 'paint'} onClick={() => changeTool('paint')} />
@@ -498,7 +516,7 @@ export default function App({ modelWarning = false }) {
           <IconButton icon={ChevronDown} label="降低视角" onClick={() => world.current?.command('tiltDown')} />
           <IconButton icon={BoxIcon} label="透视镜头" active={perspective} onClick={() => world.current?.command('projection')} />
           <IconButton icon={Scan} label="自动剖墙" active={cutaway} onClick={() => setCutaway(v => !v)} />
-          <IconButton icon={Home} label={roof ? '隐藏屋顶' : '显示屋顶'} active={roof} onClick={() => setRoof(v => !v)} />
+          {!apartment&&<IconButton icon={Home} label={roof ? '隐藏屋顶' : '显示屋顶'} active={roof} onClick={() => setRoof(v => !v)} />}
           <IconButton icon={Grid2X2} label="显示建造网格" active={showGrid} onClick={() => setShowGrid(v => !v)} />
           <IconButton icon={MapIcon} label="青禾镇地图" onClick={() => setModal('map')} />
           <IconButton icon={Footprints} label="跟随居民" onClick={() => world.current?.command('follow')} />
@@ -519,13 +537,14 @@ export default function App({ modelWarning = false }) {
           <div className="object-actions"><button onClick={() => moveFurniture(selected)}><Move size={16} />移动</button><button onClick={rotate}><RotateCw size={16} />旋转</button><button disabled={game.budget < selectedInfo.price} onClick={() => { beginPlace({ ...selectedInfo, color: selectedObject.color }); }}><Copy size={16} />复制</button><button className="danger" onClick={() => removeFurniture(selected)}><Trash2 size={16} />收回</button></div>
         </> : <>
           <div className="home-title"><div className="home-emblem"><Home size={26} strokeWidth={1.3} /><Leaf size={13} /></div><div><h2>{game.home.name}</h2><p>一处小家，许多种可能</p></div></div>
-          <div className="house-numbers"><div><strong>{floorRegions(game.home).reduce((area, r) => area + (r.x2 - r.x1) * (r.z2 - r.z1), 0)}<small>m²</small></strong><span>房屋面积</span></div><span /><div><strong data-testid="furniture-count">{game.home.furniture.length}<small>件</small></strong><span>已放置物品</span></div></div>
+          <div className="house-numbers"><div><strong>{Math.round(floorRegions(game.home).filter(r=>r.id!=='corridor').reduce((area, r) => area + (r.x2 - r.x1) * (r.z2 - r.z1), 0)*10)/10}<small>m²</small></strong><span>{apartment?'套内与阳台':'房屋面积'}</span></div><span /><div><strong data-testid="furniture-count">{game.home.furniture.length}<small>件</small></strong><span>已放置物品</span></div></div>
           <div className="panel-tabs"><button className={panel === 'home' ? 'active' : ''} onClick={() => setPanel('home')}>空间设置</button><button className={panel === 'style' ? 'active' : ''} onClick={() => setPanel('style')}>材质与配色</button></div>
           {panel === 'home' ? <>
-            <section className="inspector-section"><h3>房屋尺寸<BrickWall size={14} /></h3><Range label="宽度" value={game.home.width} min={10} max={16} step={1} suffix=" m" onChange={v => resizeHome('width', v)} /><Range label="进深" value={game.home.depth} min={8} max={14} step={1} suffix=" m" onChange={v => resizeHome('depth', v)} /></section>
-            <section className="inspector-section"><h3>墙体</h3><div className="segmented"><button className={!roof ? 'active' : ''} onClick={() => setRoof(false)}>剖面视图</button><button className={roof ? 'active' : ''} onClick={() => setRoof(true)}>完整房屋</button></div></section>
+            {apartment?<section className="inspector-section"><h3>301 户型<Building2 size={14}/></h3><div className="dimensions"><span>12 <small>m</small></span><X size={12}/><span>9 <small>m</small></span></div></section>:
+              <><section className="inspector-section"><h3>房屋尺寸<BrickWall size={14} /></h3><Range label="宽度" value={game.home.width} min={10} max={16} step={1} suffix=" m" onChange={v => resizeHome('width', v)} /><Range label="进深" value={game.home.depth} min={8} max={14} step={1} suffix=" m" onChange={v => resizeHome('depth', v)} /></section>
+              <section className="inspector-section"><h3>墙体</h3><div className="segmented"><button className={!roof ? 'active' : ''} onClick={() => setRoof(false)}>剖面视图</button><button className={roof ? 'active' : ''} onClick={() => setRoof(true)}>完整房屋</button></div></section></>}
             <section className="inspector-section inline-setting"><span>对齐网格</span><button role="switch" aria-checked={showGrid} aria-label="对齐网格" className={`toggle ${showGrid ? 'on' : ''}`} onClick={() => setShowGrid(s => !s)}><span /></button></section>
-            <section className="inspector-section lot-actions"><button className="secondary-button" onClick={addBathroom}><Bath size={15} />添加卫浴间</button><button className="text-button danger" onClick={() => setModal('clear-lot')}><Trash2 size={14} />清空建筑与家具</button></section>
+            <section className="inspector-section lot-actions">{!apartment&&<button className="secondary-button" onClick={addBathroom}><Bath size={15} />添加卫浴间</button>}<button className="text-button danger" onClick={() => setModal('clear-lot')}><Trash2 size={14} />{apartment?'清空套内装修':'清空建筑与家具'}</button></section>
           </> : <>
             <section className="inspector-section"><h3>墙面颜色<span>哑光乳胶漆</span></h3><Swatches colors={WALL_COLORS} value={game.home.wallColor} label="墙面颜色" onChange={wallColor => updateHome({ wallColor })} /></section>
             <section className="inspector-section"><h3>地板材质</h3><div className="floor-options">{FLOOR_STYLES.map(floor => <button className={game.home.floor === floor.id ? 'selected' : ''} aria-pressed={game.home.floor === floor.id} key={floor.id} onClick={() => updateHome({ floor: floor.id })}><span className={`floor-sample ${floor.id}`} style={{ '--floor': floor.color }}>{game.home.floor === floor.id && <Check size={14} />}</span><span>{floor.name}</span></button>)}</div></section>
@@ -541,7 +560,11 @@ export default function App({ modelWarning = false }) {
     </>}
 
     {mode === 'live' && <>
-      <button className="fishing-entry surface" aria-label="钓鱼与鱼获" onClick={()=>setModal('fishing')}><Fish size={17}/><span>钓鱼</span>{game.sim.catches.length>0 && <small>{game.sim.catches.length}</small>}</button>
+      {!apartment&&<button className="fishing-entry surface" aria-label="钓鱼与鱼获" onClick={()=>setModal('fishing')}><Fish size={17}/><span>钓鱼</span>{game.sim.catches.length>0 && <small>{game.sim.catches.length}</small>}</button>}
+      <div className={`residence-tools surface ${apartment?'':'coastal'}`}>
+        {apartment?<><button aria-label="室内剖面" title="室内剖面" aria-pressed={!apartmentExterior} onClick={()=>showApartment(false)}><Sofa size={16}/><span>室内</span></button><button aria-label="整栋公寓" title="整栋公寓" aria-pressed={apartmentExterior} onClick={()=>showApartment(true)}><Building2 size={16}/><span>整栋</span></button><IconButton icon={ArrowLeftRight} label="切换住宅" onClick={()=>setModal('residence')}/></>:
+          <button onClick={()=>setModal('residence')}><Building2 size={16}/><span>搬入公寓</span></button>}
+      </div>
       <ResidentPanel game={game} activity={activity} walking={walking} Portrait={AvatarPortrait} onEdit={() => changeMode('avatar')} onCancel={() => world.current?.cancelActivity()} neighbors={neighbors} onChat={id => world.current?.startChat(id)} onTabKey={onTabKey} onAutonomy={value => dispatch({ type: 'sim', value: { autonomy: value } })}
         queue={queue} onRemoveQueue={id=>world.current?.queue.remove(id)} onClearQueue={()=>world.current?.queue.clear()} onMoveQueue={id=>world.current?.queue.moveUp(id)} />
       <TimeControls sim={game.sim} speed={speed} setSpeed={setSpeed} />
@@ -600,18 +623,26 @@ export default function App({ modelWarning = false }) {
       <div className="modal-bottom"><label><Sun size={16} /><span>傍晚光线</span><input type="checkbox" checked={evening} onChange={e => setEvening(e.target.checked)} /></label><button className="text-button" onClick={() => setModal('reset')}>重新开始</button></div>
       {toast && <div className="modal-notice" role="status" aria-label="游戏通知">{toast}</div>}
     </Modal>}
-    {modal === 'reset' && <Modal title="开启新的小日子？" onClose={() => setModal('save')}><p className="reset-warning">当前的房屋和居民会被替换。建议先导出存档，保留这个小世界。</p><div className="reset-actions"><button className="secondary-button" onClick={() => setModal('save')}>返回</button><button className="secondary-button" onClick={exportSave}>导出当前存档</button><button className="primary-button" onClick={() => { const next = newGame(false); dispatch({ type: 'load', value: next }); setDraft({...next.avatar,name:''}); cancelPlacement(); setSelected(null); setActivity(null); setInteraction(null); setMode('avatar'); setModal(null); notify('新的日常，从这里开始'); }}>重新开始</button></div></Modal>}
-    {modal === 'clear-lot' && <Modal title="清空建筑与家具？" onClose={() => setModal(null)}><p className="reset-warning">拆除所有墙体、地板并收回家具。居民和需求不会重置，此操作可以撤销。</p><div className="reset-actions"><button className="secondary-button" onClick={() => setModal(null)}>取消</button><button className="primary-button" onClick={clearLot}>确认清空地块</button></div></Modal>}
+    {modal === 'reset' && <Modal title="开启新的小日子？" onClose={() => setModal('save')}><p className="reset-warning">当前的房屋和居民会被替换。建议先导出存档，保留这个小世界。</p><div className="reset-actions"><button className="secondary-button" onClick={() => setModal('save')}>返回</button><button className="secondary-button" onClick={exportSave}>导出当前存档</button><button className="primary-button" onClick={() => { const next = newApartmentGame(false); dispatch({ type: 'load', value: next }); setDraft({...next.avatar,name:''}); cancelPlacement(); setSelected(null); setActivity(null); setInteraction(null); setMode('avatar'); setModal(null); notify('新的日常，从这里开始'); }}>重新开始</button></div></Modal>}
+    {modal==='residence'&&<Modal title={apartment?'返回海岸住宅？':'搬入青禾公寓？'} onClose={()=>setModal(null)}>
+      <p className="reset-warning">当前住宅的装修与余额会单独保留，可随时切回。居民、需求、游戏时间和鱼获保持不变。</p>
+      <div className="reset-actions"><button className="secondary-button" onClick={()=>setModal(null)}>取消</button><button className="primary-button" onClick={moveHome}><Building2 size={16}/>{apartment?'返回海岸住宅':'确认搬入公寓'}</button></div>
+    </Modal>}
+    {modal === 'clear-lot' && <Modal title={apartment?'清空套内装修？':'清空建筑与家具？'} onClose={() => setModal(null)}><p className="reset-warning">{apartment?'收回家具并拆除套内隔墙，保留外墙、楼板和阳台。':'拆除所有墙体、地板并收回家具。'}居民和需求不会重置，此操作可以撤销。</p><div className="reset-actions"><button className="secondary-button" onClick={() => setModal(null)}>取消</button><button className="primary-button" onClick={clearLot}>{apartment?'确认清空套内':'确认清空地块'}</button></div></Modal>}
     {modal === 'fishing' && <Modal title="钓鱼与鱼获" onClose={()=>setModal(null)}>
       <div className="fishing-spots">{FISHING_SPOTS.map(spot=><button key={spot.id} onClick={()=>{world.current?.startFishing(spot.id);setModal(null);}}><Fish size={20}/><span>{spot.name}</span><ChevronRight size={16}/></button>)}</div>
       <div className="catch-collection"><h3>鱼获 <span>{game.sim.catches.length}</span></h3>{FISH.map(fish=><div key={fish.id}><FishSymbol size={23} style={{color:fish.color}}/><span>{fish.name}</span><strong>{game.sim.catches.filter(c=>c.type===fish.id).length}</strong></div>)}</div>
     </Modal>}
-    {modal === 'map' && <Modal title="青禾镇" wide onClose={() => setModal(null)}>
+    {modal === 'map' && <Modal title={apartment?'青禾公寓 · 301':'青禾镇'} wide onClose={() => setModal(null)}>
       <div className="town-map"><MiniMap x={game.sim.x} z={game.sim.z} home={game.home} /></div>
-      <nav className="landmark-list" aria-label="小镇目的地">{LANDMARKS.map(place => <button key={place.id} aria-label={`前往${place.name}`} onClick={() => visitPlace(place)}>
+      <nav className="landmark-list" aria-label="小镇目的地">{(apartment?[
+        {id:'home',name:'公寓客厅',subtitle:'301 · 套内',x:0,z:0},
+        {id:'balcony',name:'阳台',subtitle:'南向 · 绿植与晾晒',x:0,z:5.5},
+        {id:'corridor',name:'公共走廊',subtitle:'邻里 · 入户门',x:7.25,z:-1.5},
+      ]:LANDMARKS).map(place => <button key={place.id} aria-label={`前往${place.name}`} onClick={() => visitPlace(place)}>
         {place.id === 'home' ? <Home size={18} /> : <MapPin size={18} />}<strong>{place.name}</strong><ChevronRight size={14} /><span>{place.subtitle}</span>
       </button>)}</nav>
-      <div className="map-legend"><span><i className="map-you" />{game.avatar.name}</span><span><i className="map-home" />住宅区</span><button className="secondary-button" onClick={() => { setModal(null); world.current?.command('map'); }}>街区全景<Expand size={14} /></button></div>
+      <div className="map-legend"><span><i className="map-you" />{game.avatar.name}</span><span><i className="map-home" />住宅区</span><button className="secondary-button" onClick={() => { setModal(null); if(apartment)showApartment(true);else world.current?.command('map'); }}>{apartment?'整栋外观':'街区全景'}<Expand size={14} /></button></div>
     </Modal>}
   </main>;
 }
@@ -622,6 +653,16 @@ function HairPreview({ avatar, hair }) {
 }
 
 function MiniMap({ small = false, x, z, home }) {
+  if(isApartment(home))return <svg className="full-map" viewBox="-7 -5.5 16.5 12.7" role="img" aria-label="公寓套内与公共走廊平面图">
+    <rect x="-7" y="-5.5" width="16.5" height="12.7" fill="#dce5df"/>
+    {floorRegions(home).map(r=><rect key={r.id} x={r.x1} y={r.z1} width={r.x2-r.x1} height={r.z2-r.z1} fill={r.id==='foundation'?'#efe8d9':'#bfd0c8'}/>)}
+    {home.furniture.filter(f=>!ITEM_MAP[f.type].flat).map(f=><rect key={f.id} x={f.x-ITEM_MAP[f.type].width/2} y={f.z-ITEM_MAP[f.type].depth/2}
+      width={ITEM_MAP[f.type].width} height={ITEM_MAP[f.type].depth} transform={`rotate(${-f.rotation*180/Math.PI} ${f.x} ${f.z})`} fill={f.color} stroke="#81958b" strokeWidth=".04"/>)}
+    {allWalls(home).flatMap(w=>wallParts(w,true).map((p,i)=><rect key={`${w.id}-${i}`} x={p.x-p.width/2} y={p.z-p.depth/2} width={p.width} height={p.depth} fill="#687f76"/>))}
+    <text x="7.2" y="-3.6" fontSize=".45" textAnchor="middle" fill="#416356">走廊</text>
+    <text x="0" y="6" fontSize=".45" textAnchor="middle" fill="#416356">阳台</text>
+    <circle cx={x} cy={z} r=".19" fill="#477d65" stroke="#fff" strokeWidth=".06"/>
+  </svg>;
   return <svg className={small ? 'mini-map' : 'full-map'} viewBox="-40 -32 80 67" role="img" aria-label="青禾镇街区地图">
     <rect x="-40" y="-32" width="80" height="67" fill="#8eb7b9" />
     {layout.lands.map(land => <polygon key={land.id} points={land.polygon.map(p => p.join(',')).join(' ')} fill={land.color} stroke="#718b60" strokeWidth=".35" />)}

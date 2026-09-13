@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { finishOnboarding } from './helpers.js';
+import { finishOnboarding,seedCoastalHome } from './helpers.js';
 
 test('desktop and mobile scenes render their actual models', async ({ page }) => {
   const errors = [];
+  await seedCoastalHome(page);
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
   await expect(page.locator('.world-loading')).toHaveCount(0);

@@ -1,3 +1,5 @@
+import { APARTMENT, apartmentExterior, isApartment } from './residence.js';
+
 export const HOUSE_FLOOR = 0.25;
 export const HOUSE_WINDOW = Object.freeze({
   bottom: 0.86,
@@ -15,6 +17,7 @@ export function floorRegions(home) {
   return [
     ...(home.foundation === false ? [] : [{ id: 'foundation', x1: -home.width / 2, x2: home.width / 2, z1: -home.depth / 2, z2: home.depth / 2 }]),
     ...(home.rooms || []),
+    ...(isApartment(home)?[APARTMENT.balcony,APARTMENT.corridor]:[]),
   ];
 }
 
@@ -23,6 +26,7 @@ export function onFloor(home, x, z, margin = 0) {
 }
 
 export function exteriorRecords(home) {
+  if(isApartment(home))return apartmentExterior();
   if (home.foundation === false) return [];
   const w = home.width / 2, d = home.depth / 2;
   return [
@@ -112,6 +116,7 @@ export function sharedWall(a, b) {
 }
 
 export function removeWall(home, id) {
+  if(isApartment(home)&&id.startsWith('exterior-'))return home;
   return id.startsWith('exterior-')
     ? { ...home, removedExterior: [...new Set([...(home.removedExterior || []), id])] }
     : { ...home, walls: home.walls.filter(wall => wall.id !== id) };
@@ -120,6 +125,7 @@ export function removeWall(home, id) {
 export function setWallOpening(home, id, kind, point) {
   const wall = allWalls(home).find(w => w.id === id);
   if (!wall) return { error: '墙体已经不存在了' };
+  if(wall.locked)return {error:'公寓外墙与入户门由楼宇统一维护'};
   const axis = wallAxis(wall), width = kind === 'door' ? 1.5 : 1.4;
   if (axis.end - axis.start < width + 0.3) return { error: '墙段太短，请选择至少 2 米的墙体' };
   const value = axis.horizontal ? point.x : point.z;

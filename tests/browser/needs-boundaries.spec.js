@@ -4,7 +4,7 @@ import { newGame } from '../../src/game.js';
 const diag = page => page.evaluate(() => window.__sunny.diagnostics({ pixels:false }));
 async function boot(page, game) {
   await page.addInitScript(game => localStorage.setItem('sunny-life.save.v1', JSON.stringify(game)), game);
-  await page.goto('/');
+  await page.goto('/',{waitUntil:'domcontentloaded'});
   await expect(page.locator('.world-loading')).toHaveCount(0);
   await page.waitForTimeout(900);
 }

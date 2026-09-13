@@ -1,6 +1,6 @@
-import { findPath, footprint, ITEM_MAP, activityTypes, rectanglesOverlap, surfaceHeight } from './game.js';
+import { findPath, footprint, ITEM_MAP, activityTypes, rectanglesOverlap, surfaceHeight, worldColliders } from './game.js';
 import { wallColliders } from './architecture.js';
-import { WORLD_COLLIDERS } from './terrain.js';
+import { apartmentWalkable, isApartment } from './residence.js';
 import residentLayout from './resident-layout.json' with { type:'json' };
 import { SINK_LAYOUT, sinkCenter } from './handwashing.js';
 import { bedSeatAngle } from './bed-motion.js';
@@ -18,11 +18,12 @@ export function localPoint(object, x, z) {
 
 function clearCorridor(home, from, to, ignored) {
   const obstacles = [
-    ...wallColliders(home), ...WORLD_COLLIDERS,
+    ...wallColliders(home), ...worldColliders(home),
     ...home.furniture.filter(f => f.id !== ignored && !ITEM_MAP[f.type].flat).map(f => ({ ...f, ...footprint(f) })),
   ];
   for (let t = 0; t <= 1; t += 0.08) {
     const body = { x: from.x + (to.x - from.x) * t, z: from.z + (to.z - from.z) * t, width: 0.42, depth: 0.42 };
+    if(isApartment(home)&&!apartmentWalkable(body.x,body.z,.21))return false;
     if (obstacles.some(obstacle => rectanglesOverlap(body, obstacle, 0.02))) return false;
   }
   return true;

@@ -1,4 +1,11 @@
 import { expect } from '@playwright/test';
+import {newGame} from '../../src/game.js';
+
+export async function seedCoastalHome(page) {
+  await page.addInitScript(game=>{
+    if(!localStorage.getItem('sunny-life.save.v1'))localStorage.setItem('sunny-life.save.v1',JSON.stringify(game));
+  },newGame());
+}
 
 export async function finishOnboarding(page) {
   await expect(page.locator('.world-loading')).toHaveCount(0);

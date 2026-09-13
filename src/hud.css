@@ -56,6 +56,12 @@
 .lot-actions > button { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .fishing-entry { position:absolute; left:16px; top:108px; z-index:4; display:flex; align-items:center; gap:8px; padding:10px; font-size:11px; color:var(--leaf); }
 .fishing-entry small { font-variant-numeric:tabular-nums; }
+.residence-tools { position:absolute; left:16px; top:108px; z-index:4; display:flex; align-items:center; gap:4px; padding:4px; border-radius:6px; }
+.residence-tools.coastal { top:156px; }
+.residence-tools > button { min-height:36px; display:flex; align-items:center; justify-content:center; gap:6px; padding:7px 9px; font-size:11px; color:var(--leaf); border-radius:4px; }
+.residence-tools > button[aria-pressed="true"], .residence-tools > button:hover { background:var(--leaf-light); }
+.residence-tools > .icon-button { width:36px; height:36px; flex-basis:36px; }
+.residence-apartment .home-footer { display:none; }
 .fishing-spots { padding:8px 24px; }
 .fishing-spots button { display:flex; align-items:center; gap:12px; width:100%; min-height:52px; border-bottom:1px solid var(--line); color:var(--leaf); }
 .fishing-spots button span { flex:1; text-align:left; }
