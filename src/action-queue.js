@@ -1,5 +1,6 @@
 import { ACTIVITIES, ITEM_MAP, activityTypes, uid } from './game.js';
 import { FISHING_SPOTS } from './fishing.js';
+import { isApartment } from './residence.js';
 
 export class ActionQueue {
   constructor(world) {
@@ -19,6 +20,7 @@ export class ActionQueue {
       if (!info || !activityTypes(object.type).includes(activity)) return false;
       label = ACTIVITIES[activity].label; detail = info.name;
     } else if (command.kind === 'chat') {
+      if(isApartment(world.state.game.home))return false;
       const person = world.npcs.find(n => n.id === command.targetId);
       if (!person) return false;
       label = '聊天'; detail = person.data.name;

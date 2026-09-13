@@ -83,10 +83,11 @@ test('balcony and shared corridor are walkable but apartment rails stay inside t
     await expect.poll(()=>diag(page).then(d=>d.position[2]),{timeout:15000}).toBeCloseTo(z,0);
     await expect.poll(()=>diag(page).then(d=>d.pathLength)).toBe(0);
   }
-  await page.getByRole('tab',{name:'邻居',exact:true}).click();
-  await page.getByRole('button',{name:'与江宁聊天',exact:true}).click();
+  expect((await diag(page)).neighbors).toEqual([]);
+  await page.getByRole('tab',{name:'社交',exact:true}).click();
+  await page.getByRole('button',{name:'网上聊天',exact:true}).click();
   await expect.poll(()=>diag(page).then(d=>d.activity?.stage),{timeout:15000}).toBe('active');
-  expect((await diag(page)).neighbors[0].busy).toBe(true);
+  expect((await diag(page)).activity.type).toBe('onlineChat');
 });
 
 test('apartment editing protects shell and corridor, clears only the fit-out and supports undo',async({page})=>{
@@ -102,16 +103,16 @@ test('apartment editing protects shell and corridor, clears only the fit-out and
   expect((await diag(page)).furniture).toHaveLength(0);
   expect((await diag(page)).walls).toHaveLength(4);
   await page.getByRole('button',{name:'撤销',exact:true}).click();
-  expect((await diag(page)).furniture).toHaveLength(16);
+  expect((await diag(page)).furniture).toHaveLength(17);
   expect((await diag(page)).walls).toHaveLength(7);
   await page.getByRole('button',{name:'选择家具',exact:true}).click();
   await page.getByRole('button',{name:'展开家具目录',exact:true}).click();
   await page.getByRole('button',{name:'放置一盆龟背竹',exact:true}).click();
   await clickWorld(page,7.2,.25,1.5);
-  expect((await diag(page)).furniture).toHaveLength(16);
+  expect((await diag(page)).furniture).toHaveLength(17);
   await expect(page.getByRole('status',{name:'游戏通知'})).toContainText('公共走廊');
-  await clickWorld(page,0,.25,2.5);
-  await expect.poll(()=>diag(page).then(d=>d.furniture.length)).toBe(17);
+  await clickWorld(page,0,.25,5.5);
+  await expect.poll(()=>diag(page).then(d=>d.furniture.length)).toBe(18);
 });
 
 test('new residents live in apartments and can eat in the new kitchen layout',async({page})=>{

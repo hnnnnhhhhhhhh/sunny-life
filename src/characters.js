@@ -151,7 +151,8 @@ class ResidentAnimator {
   }
 
   showAccessory(name, visible) {
-    for (const node of this.accessories.get(name) || []) node.visible = visible;
+    for (const node of this.accessories.get(name) || [])
+      node.visible = visible && (!node.userData.base || node.userData.base === (this.avatar.base || 'female'));
   }
 
   seatOffset(seatTop = 0.57) {
@@ -215,7 +216,8 @@ class ResidentAnimator {
   sleepWear(sleeping) {
     this.showAccessory('sleep-socks',sleeping);
     this.rig.traverse(node => {
-      if (['Shoes', 'Sole'].includes(node.userData.role)) node.visible = !sleeping;
+      if (['Shoes', 'Sole'].includes(node.userData.role))
+        node.visible = !sleeping && (!node.userData.base || node.userData.base === (this.avatar.base || 'female'));
     });
   }
 
@@ -266,6 +268,25 @@ class ResidentAnimator {
     this.root.updateMatrixWorld(true);
     this.washTargets=weight>0?targets:null;
     return {left:this.point('Palm_L'),right:this.point('Palm_R')};
+  }
+
+  typingPose(targets, time, weight=1) {
+    this.bones.get('Spine').rotation.x+=.12*weight;
+    this.bones.get('Head').rotation.x+=.06*weight;
+    for(const side of ['L','R']) {
+      this.bones.get(`UpperArm_${side}`).rotation.x-=.3*weight;
+      this.bones.get(`Forearm_${side}`).rotation.x-=.45*weight;
+    }
+    this.root.updateMatrixWorld(true);
+    for(const [side,key] of [['L','left'],['R','right']]) {
+      const goal=this.bones.get(`WashTarget_${side}`);
+      const target=this.point(`Palm_${side}`).lerp(targets[key],weight);
+      goal.position.copy(goal.parent.worldToLocal(target));
+      goal.updateMatrixWorld(true);
+    }
+    this.washIK.update();
+    this.root.updateMatrixWorld(true);
+    this.washTargets=weight>0?targets:null;
   }
 
   washPose(time) {

@@ -12,6 +12,7 @@ import { ActionQueue } from './action-queue.js';
 import residentLayout from './resident-layout.json' with { type:'json' };
 import { apartmentWalkable, isApartment } from './residence.js';
 import { createApartmentEnvironment, createApartmentGrid, dressApartment } from './apartment-models.js';
+import { createHomeLighting, daylightAt } from './daylight.js';
 
 export class World {
   constructor(container, emit) {
@@ -210,12 +211,13 @@ export class World {
       this.worldRoot.add(this.apartmentGrid);
     }
     if(residenceChanged||!old) {
-      (apartment?this.worldRoot:this.environment).add(this.npcRoot);
-      this.npcs.forEach((npc,i)=>{
-        Object.assign(npc.data,apartment?{x:7.25,z:[-2.6,2.6,.6][i]}:npc.coastalPosition);
-        npc.mesh.position.set(npc.data.x,apartment?.25:terrainHeight(npc.data.x,npc.data.z)+.04,npc.data.z);
+      this.npcRoot.visible=!apartment;
+      this.npcs.forEach(npc=>{
+        Object.assign(npc.data,npc.coastalPosition);
+        npc.mesh.position.set(npc.data.x,terrainHeight(npc.data.x,npc.data.z)+.04,npc.data.z);
         npc.busy=false;
       });
+      this.emitNeighbors();
     }
     this.environment.visible=mode!=='avatar'&&!apartment;
     if(this.apartmentSystem) {
@@ -231,6 +233,9 @@ export class World {
       this.houseKey = houseKey;
     }
     if (home !== old?.game.home) {
+      if(this.homeLighting){this.worldRoot.remove(this.homeLighting.root);disposeModel(this.homeLighting.root);}
+      this.homeLighting=createHomeLighting(home,(x,z)=>surfaceHeight(home,x,z));
+      this.worldRoot.add(this.homeLighting.root);
       this.navGrid = navigationGrid(home);
       this.autonomy.manual();
       this.environmentSystem.grass.updateHome(home);
@@ -326,11 +331,7 @@ export class World {
       if(apartment&&!studio)this.command(state.apartmentExterior?'apartmentExterior':'home');
       this.updateProjection();
     }
-    if (state.evening !== old?.evening) {
-      this.sun.color.set(state.evening ? '#f4cba4' : '#fff0d5');
-      this.sun.intensity = state.evening ? 2.5 : 3.1;
-      this.hemi.intensity = state.evening ? 1.3 : 1.65;
-    }
+    this.updateDaylight();
     this.renderer.domElement.style.cursor = pending || drawing || ['door', 'window'].includes(state.tool) ? 'crosshair' : state.tool === 'delete' ? 'not-allowed' : 'grab';
   }
 
@@ -423,7 +424,7 @@ export class World {
       else this.emit({ type: 'select', id: null });
     } else {
       this.autonomy.manual();
-      const npcHit = this.raycaster.intersectObject(this.npcRoot, true)[0];
+      const npcHit = this.npcRoot.visible && this.raycaster.intersectObject(this.npcRoot, true)[0];
       if (hit && (!npcHit || hit.distance < npcHit.distance)) this.emit({ type: 'interact', id: hit.object.userData.furnitureId, anchor: { x: event.clientX, y: event.clientY } });
       else if (npcHit) this.startChat(npcHit.object.userData.npcId);
       else {
@@ -463,7 +464,14 @@ export class World {
   }
 
   startChat(id) {
+    if(isApartment(this.state.game.home))return false;
     return this.queue.add({ kind:'chat',targetId:id });
+  }
+
+  startOnlineChat() {
+    const desk=this.state.game.home.furniture.find(f=>f.type==='desk');
+    if(!desk){this.emit({type:'toast',message:'家中还没有电脑桌，可在卧室家具中放置'});return false;}
+    return this.startActivity(desk.id,undefined,'onlineChat');
   }
 
   startFishing(id) {
@@ -472,7 +480,7 @@ export class World {
   }
 
   emitNeighbors() {
-    this.emit({ type: 'neighbors', neighbors: this.npcs.map(npc => ({ id: npc.id, name: npc.data.name, busy: npc.busy })) });
+    this.emit({ type: 'neighbors', neighbors: isApartment(this.state?.game.home)?[]:this.npcs.map(npc => ({ id: npc.id, name: npc.data.name, busy: npc.busy })) });
   }
 
   cancelActivity() {
@@ -483,7 +491,7 @@ export class World {
 
   command(action, place) {
     const apartment=isApartment(this.state?.game.home);
-    if(apartment&&['home','follow','dining','activity','television'].includes(action))this.emit({type:'apartmentView',exterior:false});
+    if(apartment&&['home','follow','dining','activity','television','computer'].includes(action))this.emit({type:'apartmentView',exterior:false});
     if(apartment&&action==='apartmentExterior') {
       this.cameraTransition={position:new THREE.Vector3(24,16,32),target:new THREE.Vector3(0,-1.8,0),zoom:this.width<760?.8:1.3};
       return;
@@ -523,6 +531,10 @@ export class World {
     } else if (action === 'dining' && place) {
       const target = new THREE.Vector3(place.x, place.floor + 0.85, place.z);
       this.cameraTransition = { position: target.clone().add(new THREE.Vector3(19, 16, 17)), target, zoom: 3.1 };
+    } else if(action==='computer'&&place) {
+      const target=new THREE.Vector3(place.x,place.floor+1,place.z);
+      const offset=new THREE.Vector3(15,13,22).applyAxisAngle(new THREE.Vector3(0,1,0),place.rotation);
+      this.cameraTransition={position:target.clone().add(offset),target,zoom:3.3};
     } else if (action === 'activity' && place) {
       const target = new THREE.Vector3(place.x, place.floor + 0.8, place.z);
       this.cameraTransition = { position: target.clone().add(new THREE.Vector3(21, 19, 24)), target, zoom: 2.25 };
@@ -544,6 +556,21 @@ export class World {
     } else if (action === 'fullBody') {
       this.cameraTransition = { position: new THREE.Vector3(3.2, 2.65, 7), target: new THREE.Vector3(0, 1.2, 0), zoom: 1 };
     }
+  }
+
+  updateDaylight() {
+    if(!this.state)return;
+    const studio=this.state.mode==='avatar',light=daylightAt(studio?720:this.state.game.sim.time);
+    this.lightState=light;
+    this.scene.background.copy(studio?new THREE.Color('#e5e9df'):light.sky);
+    this.scene.fog.color.copy(this.scene.background);
+    this.sun.color.copy(light.sunColor);this.sun.intensity=light.sun;
+    this.sun.position.copy(light.sunPosition);
+    this.hemi.color.copy(light.sunColor);this.hemi.groundColor.copy(light.ground);this.hemi.intensity=light.ambient;
+    this.homeLighting?.update(light.lamps);
+    this.homeLighting?.setCeilingVisible(!!this.state.roof||!!this.state.apartmentExterior);
+    this.apartmentSystem?.setNight(light.lamps);
+    this.environmentSystem.ocean.setDaylight(light);
   }
 
   animate(time) {
@@ -604,7 +631,7 @@ export class World {
         }
       }
       this.npcs.forEach(npc => {
-        if (mode !== 'live' || !speed) return;
+        if (mode !== 'live' || !speed || isApartment(game.home)) return;
         const { mesh, data } = npc;
         if (npc.busy) {
           mesh.userData.controller?.play(npc.conversationClip || 'Idle');
@@ -624,6 +651,7 @@ export class World {
         } else mesh.userData.legs.forEach((leg, i) => { leg.rotation.x = Math.sin(time * 0.005) * 0.22 * (i ? 1 : -1); });
       });
       for (const { mesh } of this.items.values()) mesh.userData.screenPlayback?.update(mode === 'live' ? dt * speed : 0);
+      for (const { mesh } of this.items.values()) mesh.userData.computerPlayback?.update(mode === 'live' ? dt * speed : 0);
       this.queue.update();
       this.autonomy.update(dt * speed);
     }
@@ -678,6 +706,10 @@ export class World {
       previewSource: this.preview?.userData.source || null,
       environment: { landmarks: this.environmentSystem.assets, waterTime: this.environmentSystem.waterTime(), waterSamples, grass: this.environmentSystem.grass.diagnostics(), ocean:this.environmentSystem.ocean.diagnostics() },
       resident: this.player?.userData.controller?.diagnostics() || null,
+      lighting:{time:this.lightState.time,phase:this.lightState.phase,sky:this.scene.background.getHexString(),
+        sun:this.sun.intensity,ambient:this.hemi.intensity,lamps:this.lightState.lamps,fixtures:this.homeLighting?.diagnostics()},
+      computers:[...this.items].filter(([,v])=>v.mesh.userData.computerPlayback)
+        .map(([id,v])=>({id,...v.mesh.userData.computerPlayback.diagnostics()})),
       activity: this.activities.current ? { type: this.activities.current.type, stage: this.activities.current.stage, progress: this.activities.current.progress, recipe: this.activities.current.recipe, targetId: this.activities.current.targetId, seatId: this.activities.current.seatId, npcId: this.activities.current.npcId, seat: this.activities.current.seat, seatTop: this.activities.current.seatTop, pillow: this.activities.current.pillow, floor: this.activities.current.floor,
         bedTime:this.activities.current.bedTime,bedPose:this.activities.current.bedPose,stand:this.activities.current.stand } : null,
       mealVisible: !!this.activities.meal,
@@ -688,7 +720,7 @@ export class World {
       queue: this.queue.items.map(item=>({id:item.id,kind:item.kind,targetId:item.targetId,label:item.label})),
       autonomy: { enabled: this.state.game.sim.autonomy, blocked: this.autonomy.blocked, cooldown: this.autonomy.cooldown, active: !!this.activities.current?.autonomous },
       postureUp: new THREE.Vector3(0, 1, 0).applyQuaternion(this.player.quaternion).toArray(),
-      neighbors: this.npcs.map(npc => ({ id: npc.id, name: npc.data.name, position: npc.mesh.position.toArray(), rotation: npc.mesh.rotation.y, busy: npc.busy, clip: npc.mesh.userData.controller?.name })),
+      neighbors: isApartment(this.state.game.home)?[]:this.npcs.map(npc => ({ id: npc.id, name: npc.data.name, position: npc.mesh.position.toArray(), rotation: npc.mesh.rotation.y, busy: npc.busy, clip: npc.mesh.userData.controller?.name })),
       televisions: [...this.items].filter(([, item]) => item.mesh.userData.screenPlayback).map(([id, item]) => {
         const screen = item.mesh.getObjectByName('TVScreen');
         const screenPixels = (pixels ? [-0.35, 0, 0.35] : []).map(x => {
@@ -739,6 +771,7 @@ export class World {
     if(this.apartmentSystem){disposeModel(this.apartmentSystem.root);this.apartmentSystem.dispose();}
     this.environmentSystem.ocean.dispose();
     disposeModel(this.furnitureRoot);
+    if(this.homeLighting)disposeModel(this.homeLighting.root);
     this.scene.traverse(object => { if (object.userData.disposable) object.geometry?.dispose(); });
     for (const object of [this.grid, this.apartmentGrid, this.selection, this.hoverOutline, this.destination].filter(Boolean)) {
       object.geometry.dispose(); object.material.dispose();

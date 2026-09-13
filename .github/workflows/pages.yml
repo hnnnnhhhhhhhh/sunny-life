@@ -28,7 +28,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Browser Tests
-        run: npx playwright test tests/browser/coastal-release.spec.js tests/browser/resident-proportions.spec.js tests/browser/daily-life.spec.js tests/browser/apartment.spec.js tests/browser/resident-delivery.spec.js --shard=${{ matrix.shard }}/3
+        run: npx playwright test tests/browser/coastal-release.spec.js tests/browser/resident-proportions.spec.js tests/browser/daily-life.spec.js tests/browser/apartment.spec.js tests/browser/resident-delivery.spec.js tests/browser/computer-daylight.spec.js --shard=${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

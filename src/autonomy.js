@@ -1,5 +1,6 @@
 import { ACTIVITIES, ITEM_MAP } from './game.js';
 import { planActivity, planChat } from './interactions.js';
+import { isApartment } from './residence.js';
 
 const THRESHOLDS = { hunger: 48, energy: 38, bladder: 45, hygiene: 70, social: 35, fun: 35 };
 const PRIORITIES = { hunger: 1.2, energy: 1.1, bladder: 1.5, hygiene: 1, social: 0.7, fun: 0.65 };
@@ -14,7 +15,7 @@ export function autonomousCandidates(game, from, grid, neighbors = []) {
     candidates.push({ id: object.id, type, plan, score: (100 - game.sim.needs[definition.need]) * PRIORITIES[definition.need] +
       Math.min(definition.amount, 100 - game.sim.needs[definition.need]) * 0.15 - plan.distance * 0.5 });
   }
-  if (game.sim.needs.social < THRESHOLDS.social) for (const npc of neighbors.filter(n => !n.busy)) {
+  if (!isApartment(game.home) && game.sim.needs.social < THRESHOLDS.social) for (const npc of neighbors.filter(n => !n.busy)) {
     const plan = planChat(game.home, npc.mesh.position, from, grid);
     if (!plan.error) candidates.push({ id: npc.id, type: 'chat', plan, score: (100 - game.sim.needs.social) * PRIORITIES.social - plan.distance * 0.5 });
   }

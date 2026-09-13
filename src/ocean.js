@@ -32,6 +32,7 @@ export function createOcean() {
     uniforms: { color: { value: new THREE.Color('#277e98') }, tDiffuse: { value: null },
       textureMatrix: { value: new THREE.Matrix4() }, uTime: { value: 0 }, uShore: { value: null },
       uHorizon: { value: new THREE.Color('#c4d7d3').convertLinearToSRGB() },
+      uDaylight:{value:1},uSun:{value:new THREE.Vector3(-.45,.8,.3)},
       uHazeRange: { value: new THREE.Vector2(65,190) },
       uEye: { value: new THREE.Vector3() }, uView: { value: new THREE.Vector3() }, uOrtho: { value: 1 } },
     vertexShader: `
@@ -53,6 +54,8 @@ export function createOcean() {
       uniform float uOrtho;
       uniform vec3 uHorizon;
       uniform vec2 uHazeRange;
+      uniform float uDaylight;
+      uniform vec3 uSun;
       varying vec4 vMirror;
       varying vec3 vWorld;
       float heightAt(vec2 p) {
@@ -73,7 +76,7 @@ export function createOcean() {
         vec2 reflectionUV = vMirror.xy/vMirror.w + n.xz * 0.018;
         vec3 reflection = texture2D(tDiffuse, reflectionUV).rgb;
         vec3 water = mix(tint,reflection, fresnel * 0.8);
-        vec3 sun = normalize(vec3(-0.45,0.8,0.3));
+        vec3 sun = normalize(uSun);
         float spec = pow(max(dot(reflect(-sun,n),view),0.0),170.0);
         water += vec3(0.8,0.94,0.92)*spec*0.16;
         float crest = smoothstep(0.065,0.115,h)*0.055;
@@ -81,6 +84,7 @@ export function createOcean() {
         float foam = (1.0-smoothstep(0.16,0.38,abs(shore-0.55-h*1.3)))
           * (0.65+0.35*sin(p.x*2.1+p.y*1.8+uTime*0.6));
         water = mix(water, vec3(0.71,0.91,0.84),foam*0.52);
+        water *= mix(0.16,1.0,uDaylight);
         float alpha = mix(0.96,0.48,shallow);
         gl_FragColor = vec4(water,alpha + foam*0.2);
         #include <tonemapping_fragment>
@@ -144,8 +148,13 @@ export function createOcean() {
       lastReflection=-Infinity;
     },
     update(time) { mesh.material.uniforms.uTime.value = time * 0.001; },
+    setDaylight(light) {
+      mesh.material.uniforms.uHorizon.value.copy(light.sky).convertLinearToSRGB();
+      mesh.material.uniforms.uDaylight.value=light.daylight;
+      mesh.material.uniforms.uSun.value.copy(light.sunPosition).normalize();
+    },
     time() { return mesh.material.uniforms.uTime.value; },
-    diagnostics() { return { reflectedFrames, style: 'shallow-reflective', shoreResolution: 256, lowQuality, horizonHaze:[65,190], extent:4000 }; },
+    diagnostics() { return { reflectedFrames, style: 'shallow-reflective', shoreResolution: 256, lowQuality, horizonHaze:[65,190], extent:4000,daylight:mesh.material.uniforms.uDaylight.value }; },
     dispose() { mesh.dispose(); mesh.geometry.dispose(); shore.dispose(); },
   };
 }

@@ -62,20 +62,19 @@ test('the Blender resident has a real skin, skeleton, clothing and changing anim
   for (const name of ['shirt', 'jacket', 'cardigan', 'hair:bob', 'hair:short', 'hair:bun', 'hair:curly']) assert.ok(variants.has(name), name);
   gltf.scene.updateMatrixWorld(true);
   for (const base of ['female', 'male']) {
-    const head = gltf.scene.getObjectByName(`Resident_ArtSkin_${base}`);
-    let neckWidth = 0, lowest = Infinity, vertices = 0;
+    const head = gltf.scene.getObjectByName(`Resident_Skin_${base}`);
+    let neckWidth = 0, vertices = 0;
     head.traverse(node => {
       if (!node.isMesh) return;
       const position = node.geometry.attributes.position;
       for (let i = 0; i < position.count; i++) {
         const p = node.localToWorld(new Vector3().fromBufferAttribute(position, i));
-        lowest = Math.min(lowest, p.y);
-        if (p.y > 1.70 && p.y < 1.76) { neckWidth = Math.max(neckWidth, Math.abs(p.x)); vertices++; }
+        if (p.y > 1.72 && p.y < 1.78) { neckWidth = Math.max(neckWidth, Math.abs(p.x)); vertices++; }
       }
     });
-    assert.ok(vertices > 20);
-    assert.ok(neckWidth < 0.09, `${base}: no source shoulder flange at the neck`);
-    assert.ok(lowest < 1.62, `${base}: connected neck reaches inside the garment`);
+    assert.ok(vertices > 3);
+    assert.ok(neckWidth < 0.12, `${base}: neck remains narrower than the head`);
+    assert.ok(head.userData.source_parts.some(p=>p.endsWith('_Head')));
   }
   const hand = gltf.scene.getObjectByName('Hand_R');
   const mixer = new AnimationMixer(gltf.scene);

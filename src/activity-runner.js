@@ -7,6 +7,8 @@ import { createBathroomEffects } from './bathroom-effects.js';
 import { createFishingProps, planFishing } from './fishing.js';
 import { BED_TIMING, bedPoseAt } from './bed-motion.js';
 import { createHandwashEffects, handwashTargets, handwashPhase, HANDWASH_DURATION } from './handwashing.js';
+import { typingTargets } from './computer.js';
+import { isApartment } from './residence.js';
 
 const ease = value => THREE.MathUtils.smoothstep(value, 0, 1);
 
@@ -24,14 +26,14 @@ export class ActivityRunner {
     const object = home.furniture.find(item => item.id === id);
     const type = options.activity || (object && ITEM_MAP[object.type].activity);
     if (!object || !activityTypes(object.type).includes(type)) return false;
-    if(['sleep','washHands'].includes(type)&&!world.player.userData.controller) {
+    if(['sleep','washHands','onlineChat'].includes(type)&&!world.player.userData.controller) {
       if(!options.autonomous)world.emit({type:'toast',message:'人物动作资源未加载成功，请刷新后重试'});
       return false;
     }
     const from = { x: world.player.position.x, z: world.player.position.z };
     const plan = options.plan || planActivity(home, object, from, world.navGrid, world.state.game.avatar.height,type);
     if (plan.error) { if (!options.autonomous) world.emit({ type: 'toast', message: plan.error }); return false; }
-    this.current = { ...plan, type, autonomous: !!options.autonomous, fixture: { ...object }, recipe: MEALS[recipe] ? recipe : 'pancakes', stage: 'approach', elapsed: 0, progress: 0, duration: { rest: 14, watch: 16, sleep: 18, shower: 14, toilet: 9, washHands:HANDWASH_DURATION }[type] || 6.25 };
+    this.current = { ...plan, type, autonomous: !!options.autonomous, fixture: { ...object }, recipe: MEALS[recipe] ? recipe : 'pancakes', stage: 'approach', elapsed: 0, progress: 0, duration: { rest: 14, watch: 16, sleep: 18, shower: 14, toilet: 9, onlineChat:16, washHands:HANDWASH_DURATION }[type] || 6.25 };
     world.path = plan.path.slice();
     world.arrivalActivity = null;
     const end = plan.path.at(-1);
@@ -43,6 +45,7 @@ export class ActivityRunner {
   }
 
   startChat(id, options = {}) {
+    if(isApartment(this.world.state.game.home))return false;
     this.cancel(true);
     const { world } = this;
     const npc = world.npcs.find(person => person.id === id);
@@ -108,6 +111,8 @@ export class ActivityRunner {
     } else if (this.current.type === 'watch') {
       const television = this.world.state.game.home.furniture.find(item => item.id === this.current.televisionId);
       this.world.command('television', { ...television, seat: this.current.seat, floor: this.current.floor });
+    } else if(this.current.type==='onlineChat') {
+      this.world.command('computer',{...this.current.fixture,floor:this.current.floor});
     } else if (['sleep', 'shower','washHands'].includes(this.current.type) || this.current.seat) {
       const target = this.world.state.game.home.furniture.find(item => item.id === (this.current.seatId || this.current.targetId));
       this.world.command('activity', { x: target.x, z: target.z, floor: this.current.floor });
@@ -194,6 +199,7 @@ export class ActivityRunner {
     const toiletWater = world.items.get(action.targetId)?.mesh.getObjectByName('ToiletWater');
     if (toiletWater) toiletWater.scale.set(1, 1, 1.28);
     if (action.televisionId) world.items.get(action.televisionId)?.mesh.userData.screenPlayback?.setPlaying(false);
+    if (action.computerId) world.items.get(action.computerId)?.mesh.userData.computerPlayback?.setPlaying(false);
     if (action.npcId) {
       const npc = world.npcs.find(person => person.id === action.npcId);
       if (npc) { npc.busy = false; npc.conversationClip = null; npc.mesh.userData.controller?.play('Idle'); }
@@ -276,6 +282,11 @@ export class ActivityRunner {
       world.player.rotation.y = action.rotation;
       animator?.play(entering ? 'SitDown' : exiting ? 'StandUp' : action.type === 'eat' ? 'Eat' : 'SitIdle', 0.12);
       animator?.update(delta, seated, action.seatTop);
+      if(action.type==='onlineChat') {
+        if(action.stage==='active')action.chatTime=action.elapsed;
+        const weight=entering?ease((action.elapsed-.8)/.55):exiting?(1-ease(action.elapsed/.4)):1;
+        animator?.typingPose(typingTargets(action.fixture,action.floor,action.chatTime||0),action.chatTime||0,weight);
+      }
       this.bathroom?.update(action.elapsed, seated, action.stage === 'active');
       if (action.type === 'toilet' && action.stage === 'standing') {
         const water = world.items.get(action.targetId)?.mesh.getObjectByName('ToiletWater');
@@ -292,6 +303,7 @@ export class ActivityRunner {
           world.worldRoot.add(this.meal.group);
         }
         if (action.televisionId) world.items.get(action.televisionId)?.mesh.userData.screenPlayback?.setPlaying(true);
+        if (action.type==='onlineChat') world.items.get(action.computerId)?.mesh.userData.computerPlayback?.setPlaying(true);
       } else if (action.stage === 'active') {
         action.progress = Math.min(1, action.elapsed / (action.type === 'eat' ? MEALS[action.recipe].duration : action.duration));
         this.meal?.update(action.progress);
@@ -306,6 +318,7 @@ export class ActivityRunner {
           animator.showAccessory('bite', phase > 0.19 && phase < 0.57);
         }
         if (action.progress >= 1) {
+          if(action.computerId)world.items.get(action.computerId)?.mesh.userData.computerPlayback?.setPlaying(false);
           action.stage = 'standing'; action.elapsed = 0;
           animator?.showAccessory('fork', false); animator?.showAccessory('bite', false);
           animator?.play('StandUp', 0.1);

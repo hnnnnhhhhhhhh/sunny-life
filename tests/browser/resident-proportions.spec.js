@@ -26,7 +26,7 @@ test('shoulder width changes only the upper body while every outfit remains usab
       const controller=root.userData.controller;
       const points=[];
       root.traverse(node=>{
-        if(!node.isMesh||(node.userData.role||node.parent?.userData.role)!=='ArtSkin')return;
+        if(!node.isMesh||(node.userData.role||node.parent?.userData.role)!=='Skin')return;
         for(let ancestor=node;ancestor;ancestor=ancestor.parent)if(!ancestor.visible)return;
         for(let i=0;i<node.geometry.attributes.position.count;i++) {
           const p=node.localToWorld(node.getVertexPosition(i,new Vector3()));

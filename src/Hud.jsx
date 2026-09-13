@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Heart, Leaf, MessageCircle, Pause, Play, Sparkles, Sun, Users, Utensils, X, Zap, Smile, Pencil, Toilet, ShowerHead, ListOrdered, Fish, Footprints, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Heart, Leaf, MessageCircle, Pause, Play, Sparkles, Sun, Moon, Sunrise, Sunset, Monitor, Users, Utensils, X, Zap, Smile, Pencil, Toilet, ShowerHead, ListOrdered, Fish, Footprints, Trash2 } from 'lucide-react';
+import { isApartment } from './residence.js';
+import { daylightAt } from './daylight.js';
 
 const NEEDS = [
   { key: 'hunger', label: '饱腹', icon: Utensils, color: '#bb985d' },
@@ -15,8 +17,10 @@ function Tool({ icon: Icon, label, ...props }) {
   return <button className="hud-tool" aria-label={label} title={label} {...props}><Icon size={16} strokeWidth={1.7} /></button>;
 }
 
-export function ResidentPanel({ game, activity, walking, Portrait, onEdit, onCancel, neighbors, onChat, onTabKey, onAutonomy, queue, onRemoveQueue, onClearQueue, onMoveQueue }) {
+export function ResidentPanel({ game, activity, walking, Portrait, onEdit, onCancel, neighbors, onChat, onOnlineChat, onPlaceComputer, onTabKey, onAutonomy, queue, onRemoveQueue, onClearQueue, onMoveQueue }) {
   const [tab, setTab] = useState('needs');
+  const apartment=isApartment(game.home),hasComputer=game.home.furniture.some(f=>f.type==='desk');
+  const tabs=TABS.map(t=>t.id==='neighbors'&&apartment?{...t,label:'社交',icon:Monitor}:t);
   const [collapsed, setCollapsed] = useState(() => window.matchMedia('(max-width: 760px)').matches);
   const mood = Math.min(...Object.values(game.sim.needs)) < 25 ? '需要关心' : '惬意';
   return <aside className={`resident-panel surface ${collapsed ? 'is-collapsed' : ''}`} aria-label="居民状态面板">
@@ -25,7 +29,7 @@ export function ResidentPanel({ game, activity, walking, Portrait, onEdit, onCan
       <Tool icon={collapsed ? ChevronUp : ChevronDown} label={collapsed ? '展开居民面板' : '收起居民面板'} onClick={() => setCollapsed(value => !value)} />
     </div>
     {(activity || walking) && <div className="hud-activity">
-      {activity?.type === 'chat' ? <MessageCircle size={13} /> : <Leaf size={13} />}
+      {['chat','onlineChat'].includes(activity?.type) ? <MessageCircle size={13} /> : <Leaf size={13} />}
       <span>{activity?.label || '散步中'}</span>
       <Tool icon={X} label="取消当前活动" onClick={onCancel} />
     </div>}
@@ -46,21 +50,25 @@ export function ResidentPanel({ game, activity, walking, Portrait, onEdit, onCan
           <meter min={0} max={100} value={game.sim.needs[key]} aria-label={label} />
         </div>)}</div>}
         {tab === 'traits' && <div className="hud-traits">{game.avatar.traits.map(trait => <span key={trait}><Sparkles size={13} />{trait}</span>)}<button onClick={onEdit}><Pencil size={13} />编辑居民</button></div>}
-        {tab === 'neighbors' && <div className="hud-neighbors">{neighbors.map(neighbor => <div key={neighbor.id}>
+        {tab === 'neighbors' && <div className="hud-neighbors">{apartment?<div>
+          <Monitor size={15}/><span>{hasComputer?'家中电脑':'未放置电脑'}</span>
+          <Tool icon={hasComputer?MessageCircle:Pencil} label={hasComputer?'网上聊天':'放置电脑桌'} onClick={hasComputer?onOnlineChat:onPlaceComputer}/>
+        </div>:neighbors.map(neighbor => <div key={neighbor.id}>
           <span className={`status-dot ${neighbor.busy ? 'busy' : ''}`} /><span>{neighbor.name}</span>
           <small>{neighbor.busy ? '交谈中' : '闲逛中'}</small><Tool icon={MessageCircle} label={`与${neighbor.name}聊天`} disabled={neighbor.busy} onClick={() => onChat(neighbor.id)} />
         </div>)}</div>}
       </div>
       <label className="autonomy-setting"><span>自主照料</span><input type="checkbox" role="switch" aria-label="自主照料" checked={game.sim.autonomy} onChange={event => onAutonomy(event.target.checked)} /></label>
-      <nav className="resident-tabs" role="tablist" aria-label="居民信息" onKeyDown={onTabKey}>{TABS.map(({ id, label, icon: Icon }) => <button key={id} id={`resident-tab-${id}`} role="tab" aria-controls="resident-info-panel" aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} title={label} onClick={() => setTab(id)}><Icon size={15} strokeWidth={1.7} /><span>{label}</span></button>)}</nav>
+      <nav className="resident-tabs" role="tablist" aria-label="居民信息" onKeyDown={onTabKey}>{tabs.map(({ id, label, icon: Icon }) => <button key={id} id={`resident-tab-${id}`} role="tab" aria-controls="resident-info-panel" aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} title={label} onClick={() => setTab(id)}><Icon size={15} strokeWidth={1.7} /><span>{label}</span></button>)}</nav>
     </>}
   </aside>;
 }
 
 export function TimeControls({ sim, speed, setSpeed }) {
   const clock = `${String(Math.floor(sim.time / 60)).padStart(2, '0')}:${String(Math.floor(sim.time % 60)).padStart(2, '0')}`;
+  const phase=daylightAt(sim.time).phase,Icon={day:Sun,night:Moon,dawn:Sunrise,dusk:Sunset}[phase];
   return <section className="time-controls surface" aria-label="时间与倍速">
-    <div className="time-reading"><Sun size={14} /><strong>{clock}</strong><span>第 {sim.day} 天</span></div>
+    <div className="time-reading"><Icon size={14} aria-label={{day:'白天',night:'夜晚',dawn:'清晨',dusk:'黄昏'}[phase]}/><strong>{clock}</strong><span>第 {sim.day} 天</span></div>
     <div className="time-playback">
       <Tool icon={speed ? Pause : Play} label={speed ? '暂停生活' : '继续生活'} aria-pressed={speed === 0} onClick={() => setSpeed(value => value ? 0 : 1)} />
       {[1, 2, 3].map(value => <button key={value} aria-label={`${value}倍速`} aria-pressed={speed === value} className={speed === value ? 'active' : ''} onClick={() => setSpeed(value)}>{value}<small>×</small></button>)}

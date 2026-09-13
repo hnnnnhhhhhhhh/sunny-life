@@ -34,7 +34,9 @@ function plant(group,x,y,z,size=1) {
 }
 
 function glazing(group,x,y,z,width,height,panes=3) {
-  box(group,x,y,z,width,height,.055,C.glass).material=material(C.glass,{roughness:.24,metalness:.15});
+  const glass=box(group,x,y,z,width,height,.055,C.glass);
+  glass.material=material(C.glass,{roughness:.24,metalness:.15,emissive:'#ffd69d',emissiveIntensity:0});
+  glass.material.userData.nightWindow=true;
   for(const dx of [-width/2,width/2])box(group,x+dx,y,z+.045,.055,height+.08,.07,C.trim);
   for(const dy of [-height/2,height/2])box(group,x,y+dy,z+.045,width+.08,.055,.07,C.trim);
   for(let i=1;i<panes;i++)box(group,x-width/2+width*i/panes,y,z+.06,.045,height,.07,C.trim);
@@ -106,6 +108,7 @@ function distantBuilding(group,x,z,width,floors,color) {
 
 export function createApartmentEnvironment() {
   const root=new THREE.Group(),solid=new THREE.Group(),upper=new THREE.Group();
+  const streetLights=[];
   root.name='QingheApartmentBlock';
   const y=APARTMENT.streetY;
   box(solid,0,y-.18,0,220,.35,220,'#c2cbc6');
@@ -123,7 +126,11 @@ export function createApartmentEnvironment() {
   for(const x of [-12,15,27,-27]) {
     cylinder(solid,x,y+2.1,9,.04,.065,4.2,C.metal,8);
     box(solid,x,y+4.18,9.28,.12,.13,.65,C.metal,.03);
-    box(solid,x,y+4.10,9.50,.23,.035,.32,'#f7eed6');
+    const bulb=box(root,x,y+4.10,9.50,.23,.035,.32,'#f7eed6');
+    bulb.material=material('#f7eed6',{emissive:'#ffdfb0',emissiveIntensity:0});
+    bulb.material.userData.nightWindow=true;
+    const light=new THREE.PointLight('#ffdab0',0,12,1.5);
+    light.position.set(x,y+4,9.5);root.add(light);streetLights.push(light);
     cylinder(solid,x+2,y+.48,8,.16,.20,.96,'#8a8774',8);
     sphere(solid,x+2,y+2,8,.95,1.4,.9,'#73967c',true);
   }
@@ -182,7 +189,13 @@ export function createApartmentEnvironment() {
   const floorSurface=new THREE.Mesh(new THREE.PlaneGeometry(2.4,9),new THREE.MeshBasicMaterial({visible:false}));
   floorSurface.rotation.x=-Math.PI/2;floorSurface.position.set(7.2,.25,0);
   floorSurface.userData.disposable=floorSurface.userData.ownMaterial=true;root.add(floorSurface);
+  const nightMaterials=new Set();
+  root.traverse(node=>{if(node.material?.userData.nightWindow)nightMaterials.add(node.material);});
   return {root,upper,surfaces:[floorSurface],setExterior(value){upper.visible=value;},
+    setNight(amount){
+      for(const mat of nightMaterials)mat.emissiveIntensity=amount*.65;
+      for(const light of streetLights)light.intensity=amount*5;
+    },
     dispose(){signTexture.dispose();},
     diagnostics(){return {style:'urban-apartment',floor:3,storeys:3,exterior:upper.visible};}};
 }

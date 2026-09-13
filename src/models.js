@@ -7,6 +7,7 @@ import { createResidentModel } from './characters.js';
 import { createTelevision } from './activity-props.js';
 import { SINK_LAYOUT, sinkCenter } from './handwashing.js';
 import { isApartment } from './residence.js';
+import { COMPUTER, createComputerScreen } from './computer.js';
 
 const geometries = new Map(), materials = new Map();
 const geometry = (key, create) => {
@@ -206,16 +207,28 @@ export function furnitureModel(type, color) {
     cylinder(g, 0, 0.73, 0, 0.1, 0.1, 0.26, '#d5ba8f');
     cylinder(g, 0, 0.95, 0, 0.12, 0.2, 0.23, '#f0dfb9');
   } else if (type === 'desk') {
-    legs(g, 1.55, 0.62, 0.83);
-    box(g, 0, 0.86, -0.3, 1.8, 0.11, 0.8, color, 0.05);
-    box(g, -0.1, 1.16, -0.48, 0.67, 0.43, 0.045, '#6d807b', 0.02);
-    box(g, -0.1, 0.934, -0.25, 0.67, 0.03, 0.43, '#b9c4ba', 0.02);
-    littlePlant(g, 0.6, 0.93, -0.43, 0.65);
-    const chair = furnitureModel('chair', '#9eae96');
-    chair.scale.setScalar(0.68);
-    chair.rotation.y = Math.PI;
-    chair.position.z = 0.49;
+    for(const x of [-.77,.77])for(const z of [-.61,.02])
+      box(g,x,.445,z,.065,.89,.065,'#6e8580',.012);
+    box(g,0,.92,-.3,1.8,.08,.8,color,.025);
+    box(g,0,.982,-.46,.34,.035,.20,'#4e6464',.012);
+    box(g,0,1.09,-.49,.045,.22,.035,'#4e6464',.008);
+    box(g,0,1.31,-.47,.93,.60,.06,'#43585c',.018).name='ComputerMonitor';
+    box(g,0,.963,COMPUTER.keyboardZ,.56,.025,.18,'#9eacab',.01).name='ComputerKeyboard';
+    for(let row=0;row<3;row++)for(let col=0;col<10;col++)
+      box(g,(col-4.5)*.05,.981,COMPUTER.keyboardZ+(row-1)*.045,.038,.01,.031,'#e4eae6',.004);
+    box(g,0,.982,.009,.21,.01,.023,'#e4eae6',.003);
+    sphere(g,.40,.988,-.03,.045,.025,.068,'#bfcac7');
+    box(g,.65,.40,-.43,.25,.58,.40,'#526967',.025);
+    box(g,.65,.62,-.222,.10,.025,.005,'#95c4b4');
+    const chair=new THREE.Group();chair.name='ComputerChair';
+    chair.position.z=COMPUTER.seatZ;
+    for(const x of [-.22,.22])for(const z of [-.20,.20])
+      box(chair,x,.255,z,.045,.51,.045,'#6e8580',.008);
+    box(chair,0,COMPUTER.seatTop-.04,0,.54,.08,.48,'#72918b',.035);
+    box(chair,0,.89,.225,.54,.60,.06,'#72918b',.025);
     g.add(chair);
+    const computer=createComputerScreen();
+    g.add(computer.mesh);g.userData.computerPlayback=computer;
   } else if (type === 'kitchen') {
     box(g, 0, 0.415, 0, 3.9, 0.75, 0.89, color, 0.03);
     sinkBasin(g,sinkCenter(type),4,.98);
@@ -581,6 +594,7 @@ export function neighborhoodModel() {
 export function disposeModel(group) {
   group.traverse(obj => {
     obj.userData.screenPlayback?.dispose();
+    obj.userData.computerPlayback?.dispose();
     if (obj.userData.disposable && obj.geometry) obj.geometry.dispose();
     if (obj.userData.ownMaterial && obj.material) obj.material.dispose();
     if (obj.isInstancedMesh) obj.dispose();
@@ -636,5 +650,6 @@ export function modelPreview(model, portrait = false) {
   scene.remove(model);
   model.userData.controller?.dispose();
   model.userData.screenPlayback?.dispose();
+  model.userData.computerPlayback?.dispose();
   return url;
 }

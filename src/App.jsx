@@ -148,7 +148,6 @@ export default function App({ modelWarning = false }) {
   const [cutaway, setCutaway] = useState(true);
   const [perspective, setPerspective] = useState(false);
   const [lowQuality,setLowQuality]=useState(()=>new URLSearchParams(window.location.search).get('quality')==='low' || navigator.hardwareConcurrency<=4);
-  const [evening, setEvening] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [category, setCategory] = useState('all');
   const [search, setSearch] = useState('');
@@ -170,7 +169,7 @@ export default function App({ modelWarning = false }) {
   const [mobilePanel, setMobilePanel] = useState(false);
   const worldNode = useRef(null), world = useRef(null), eventHandler = useRef(null);
   const latest = useRef(null), toastTimer = useRef(null), catalogue = useRef(null), fileInput = useRef(null);
-  latest.current = { ...state, mode, tool, selected, pending, roof, cutaway, lowQuality, showGrid, speed, draft, wallStart, evening, activity, apartmentExterior, propertiesOpen: mobilePanel, catalogOpen };
+  latest.current = { ...state, mode, tool, selected, pending, roof, cutaway, lowQuality, showGrid, speed, draft, wallStart, activity, apartmentExterior, propertiesOpen: mobilePanel, catalogOpen };
   const selectedObject = game.home.furniture.find(f => f.id === selected);
   const selectedInfo = selectedObject && ITEM_MAP[selectedObject.type];
   const filtered = useMemo(() => CATALOG.filter(item => (category === 'all' || item.category === category) && `${item.name}${item.detail}`.includes(search.trim())), [category, search]);
@@ -566,6 +565,7 @@ export default function App({ modelWarning = false }) {
           <button onClick={()=>setModal('residence')}><Building2 size={16}/><span>搬入公寓</span></button>}
       </div>
       <ResidentPanel game={game} activity={activity} walking={walking} Portrait={AvatarPortrait} onEdit={() => changeMode('avatar')} onCancel={() => world.current?.cancelActivity()} neighbors={neighbors} onChat={id => world.current?.startChat(id)} onTabKey={onTabKey} onAutonomy={value => dispatch({ type: 'sim', value: { autonomy: value } })}
+        onOnlineChat={()=>world.current?.startOnlineChat()} onPlaceComputer={()=>{changeMode('build');setCategory('bedroom');beginPlace(ITEM_MAP.desk);}}
         queue={queue} onRemoveQueue={id=>world.current?.queue.remove(id)} onClearQueue={()=>world.current?.queue.clear()} onMoveQueue={id=>world.current?.queue.moveUp(id)} />
       <TimeControls sim={game.sim} speed={speed} setSpeed={setSpeed} />
       {interaction && (ITEM_MAP[interaction.type].activity === 'eat' ? <div className="interaction-menu meal-menu surface" style={menuStyle}>
@@ -620,7 +620,7 @@ export default function App({ modelWarning = false }) {
     {modal === 'save' && <Modal title="留住这个小世界" onClose={() => setModal(null)}>
       <div className="save-summary"><AvatarPortrait avatar={game.avatar} /><div><strong>{game.avatar.name}的{game.home.name}</strong><span>第 {game.sim.day} 天 · {game.home.furniture.length} 件家具 · {game.home.width * game.home.depth} m²</span></div><span className="status-dot" /></div>
       <div className="save-options"><button onClick={() => persist(true)}><Save size={20} /><span><strong>保存到浏览器</strong><small>{saved === 'saved' ? '当前进度已保存' : '保存当前进度'}</small></span><ChevronRight size={17} /></button><button onClick={exportSave}><ArrowDownToLine size={20} /><span><strong>导出存档</strong><small>Sunny Life · JSON</small></span><ChevronRight size={17} /></button><button onClick={() => fileInput.current?.click()}><ArrowUpFromLine size={20} /><span><strong>导入存档</strong><small>恢复已有的家园与居民</small></span><ChevronRight size={17} /></button><button onClick={downloadScreenshot}><Download size={20} /><span><strong>拍张纪念照</strong><small>当前场景 · PNG</small></span><ChevronRight size={17} /></button></div>
-      <div className="modal-bottom"><label><Sun size={16} /><span>傍晚光线</span><input type="checkbox" checked={evening} onChange={e => setEvening(e.target.checked)} /></label><button className="text-button" onClick={() => setModal('reset')}>重新开始</button></div>
+      <div className="modal-bottom"><button className="text-button" onClick={() => setModal('reset')}>重新开始</button></div>
       {toast && <div className="modal-notice" role="status" aria-label="游戏通知">{toast}</div>}
     </Modal>}
     {modal === 'reset' && <Modal title="开启新的小日子？" onClose={() => setModal('save')}><p className="reset-warning">当前的房屋和居民会被替换。建议先导出存档，保留这个小世界。</p><div className="reset-actions"><button className="secondary-button" onClick={() => setModal('save')}>返回</button><button className="secondary-button" onClick={exportSave}>导出当前存档</button><button className="primary-button" onClick={() => { const next = newApartmentGame(false); dispatch({ type: 'load', value: next }); setDraft({...next.avatar,name:''}); cancelPlacement(); setSelected(null); setActivity(null); setInteraction(null); setMode('avatar'); setModal(null); notify('新的日常，从这里开始'); }}>重新开始</button></div></Modal>}

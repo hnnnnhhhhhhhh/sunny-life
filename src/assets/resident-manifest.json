@@ -2,9 +2,9 @@
   "generator": "Blender 4.5.3 LTS",
   "file": "models/resident/resident.glb",
   "source": "art/blender/sunny-resident.blend",
-  "bytes": 2840268,
-  "sha256": "b5161ff0592de0efc7e0358d014c265e26a233f002dd6b6063e2dc1af75bfa9a",
-  "height": 2.21,
+  "bytes": 3496616,
+  "sha256": "7907e576d317900bdce9c1296c3239c9e7287c83ce47a81161db658e9b6ab62a",
+  "height": 2.1,
   "hipHeight": 1.08,
   "animations": [
     "Idle",
@@ -16,9 +16,10 @@
     "Talk",
     "Listen"
   ],
-  "artist": "Quaternius, Universal Base Characters (CC0)",
-  "sourceUrl": "https://quaternius.com/packs/universalbasecharacters.html",
+  "artist": "Quaternius, Ultimate Modular Women / Men (CC0)",
+  "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+  "adaptation": "Complete source character meshes, fitted interaction rig and recolorable clothing",
   "compressedFile": "models/resident/resident.glb.gz",
-  "compressedBytes": 1495681,
-  "compressedSha256": "2d22d50ba9853eb6d9bf6e6d4f5e2e6e4c3e45fb8e212d8c2a063f69a304e7c5"
+  "compressedBytes": 793764,
+  "compressedSha256": "ed391d62eebd8bb8dcd39dad104a0a85d616ec1b3259097547fa861f229f501c"
 }

@@ -12,7 +12,8 @@ from mathutils import Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_furniture as b
-from artist_parts import HEAD_SHIFT, HEAD_FORWARD, LAYOUT
+LAYOUT = json.loads((Path(__file__).resolve().parents[2] / "src/resident-layout.json").read_text())
+HEAD_SHIFT, HEAD_FORWARD = LAYOUT["headShift"], LAYOUT["headForward"]
 
 PARTS = []
 RIG = None
@@ -136,7 +137,7 @@ def bone_rig():
     ]
     for side, s in [("L", -1), ("R", 1)]:
         definitions.extend([
-            (f"UpperArm_{side}", (s * 0.218, 1.635, 0), (s * 0.263, 1.32, 0), "Chest"),
+            (f"UpperArm_{side}", (s * 0.18, 1.635, 0), (s * 0.263, 1.32, 0), "Chest"),
             (f"Forearm_{side}", (s * 0.263, 1.32, 0), (s * 0.278, 1.03, 0), f"UpperArm_{side}"),
             (f"Hand_{side}", (s * 0.278, 1.03, 0), (s * 0.282, 0.9, 0.008), f"Forearm_{side}"),
             (f"Palm_{side}", (s * 0.282, 0.964, 0.005), (s * 0.282, 0.94, 0.005), f"Hand_{side}"),
@@ -303,13 +304,14 @@ def hair():
 
 
 def accessories():
+    eye_shift = LAYOUT["eyeHeight"] - 1.935
     for s in [-1,1]:
         x = s*.055
-        bcoords = [(x-.039,1.95+HEAD_SHIFT,.165+HEAD_FORWARD),(x-.043,2.0+HEAD_SHIFT,.159+HEAD_FORWARD),
-                   (x+.04,2.0+HEAD_SHIFT,.159+HEAD_FORWARD),(x+.038,1.95+HEAD_SHIFT,.165+HEAD_FORWARD)]
+        bcoords = [(x-.039,1.95+HEAD_SHIFT+eye_shift,.165+HEAD_FORWARD),(x-.043,2.0+HEAD_SHIFT+eye_shift,.159+HEAD_FORWARD),
+                   (x+.04,2.0+HEAD_SHIFT+eye_shift,.159+HEAD_FORWARD),(x+.038,1.95+HEAD_SHIFT+eye_shift,.165+HEAD_FORWARD)]
         line("Angular glasses frame", bcoords+[bcoords[0]], .006, "Glasses", "Head", accessory="glasses")
-        line("Glasses temple", [(s*.097,1.994+HEAD_SHIFT,.164+HEAD_FORWARD),(s*.14,1.986+HEAD_SHIFT,.028+HEAD_FORWARD)], .0045, "Glasses", "Head", accessory="glasses")
-    line("Glasses bridge", [(-.013,1.982+HEAD_SHIFT,.165+HEAD_FORWARD),(0,1.988+HEAD_SHIFT,.168+HEAD_FORWARD),(.013,1.982+HEAD_SHIFT,.165+HEAD_FORWARD)], .005, "Glasses", "Head", accessory="glasses")
+        line("Glasses temple", [(s*.097,1.994+HEAD_SHIFT+eye_shift,.164+HEAD_FORWARD),(s*.14,1.986+HEAD_SHIFT+eye_shift,.028+HEAD_FORWARD)], .0045, "Glasses", "Head", accessory="glasses")
+    line("Glasses bridge", [(-.013,1.982+HEAD_SHIFT+eye_shift,.165+HEAD_FORWARD),(0,1.988+HEAD_SHIFT+eye_shift,.168+HEAD_FORWARD),(.013,1.982+HEAD_SHIFT+eye_shift,.165+HEAD_FORWARD)], .005, "Glasses", "Head", accessory="glasses")
     rounded("Fork handle", (.282,.934,.025), (.022,.124,.012), "Metal", "Hand_R", .007, accessory="fork")
     rounded("Fork shoulder", (.282,.856,.025), (.034,.047,.009), "Metal", "Hand_R", .004, accessory="fork")
     for i in range(3):
@@ -332,8 +334,13 @@ def skin_and_pack():
         obj = bpy.data.objects.new(source.name + "_Skinned", mesh)
         bpy.context.scene.collection.objects.link(obj)
         obj.parent = RIG
+        obj["artist_source"] = source.get("artist_source", "")
+        if bind is None:
+            for group in source.vertex_groups:
+                obj.vertex_groups.new(name=group.name)
         for vertex in mesh.vertices:
-            weights = bind(vertex.co) if callable(bind) else {bind: 1}
+            weights = ({source.vertex_groups[g.group].name: g.weight for g in vertex.groups}
+                       if bind is None else bind(vertex.co) if callable(bind) else {bind: 1})
             for name, weight in weights.items():
                 if weight <= 0:
                     continue
@@ -341,7 +348,7 @@ def skin_and_pack():
                 group.add([vertex.index], weight, "REPLACE")
         modifier = obj.modifiers.new("Resident skeleton", "ARMATURE")
         modifier.object = RIG
-        if role in {"Skin", "Top", "TopShade", "Trousers", "TrouserCuff", "Shoes"}:
+        if bind is not None and role in {"Skin", "Top", "TopShade", "Trousers", "TrouserCuff", "Shoes"}:
             for polygon in mesh.polygons:
                 polygon.use_smooth = True
         key = (role, variant, accessory, source.get("base"))
@@ -349,6 +356,7 @@ def skin_and_pack():
     for source, *_ in PARTS:
         bpy.data.objects.remove(source, do_unlink=True)
     for (role, variant, accessory, base), objects in groups.items():
+        source_parts = sorted({obj.get("artist_source") for obj in objects if obj.get("artist_source")})
         bpy.ops.object.select_all(action="DESELECT")
         for obj in objects:
             obj.select_set(True)
@@ -358,6 +366,9 @@ def skin_and_pack():
         obj = objects[0]
         obj.name = "_".join(filter(None, ["Resident", role, (variant or "").replace(":", "_"), accessory, base]))
         obj["role"] = role
+        obj["source_model"] = "Quaternius Ultimate Modular Characters"
+        if source_parts:
+            obj["source_parts"] = source_parts
         if variant:
             obj["variant"] = variant
         if accessory:
@@ -450,9 +461,9 @@ def main():
         bpy.context.scene.collection.children.link(b.CURRENT)
         b.ROOT = None
         RIG = bone_rig()
-        body(); clothes(); accessories()
-        from artist_parts import attach
-        attach(project, register, material("Skin"))
+        accessories()
+        from modular_resident import attach
+        attach(project, RIG, register, material)
         skin_and_pack()
         animations()
         bpy.data.orphans_purge(do_recursive=True)
@@ -475,10 +486,11 @@ def main():
     content = destination.read_bytes()
     manifest = {"generator":f"Blender {bpy.app.version_string}","file":"models/resident/resident.glb",
                 "source":"art/blender/sunny-resident.blend","bytes":len(content),
-                "sha256":hashlib.sha256(content).hexdigest(),"height":2.25+HEAD_SHIFT,"hipHeight":LAYOUT["hipHeight"],
+                "sha256":hashlib.sha256(content).hexdigest(),"height":2.1,"hipHeight":LAYOUT["hipHeight"],
                 "animations":["Idle","Walk","SitDown","SitIdle","Eat","StandUp","Talk","Listen"],
-                "artist":"Quaternius, Universal Base Characters (CC0)",
-                "sourceUrl":"https://quaternius.com/packs/universalbasecharacters.html"}
+                "artist":"Quaternius, Ultimate Modular Women / Men (CC0)",
+                "sourceUrl":"https://quaternius.com/packs/ultimatemodularwomen.html",
+                "adaptation":"Complete source character meshes, fitted interaction rig and recolorable clothing"}
     (project/"src/assets/resident-manifest.json").write_text(json.dumps(manifest,indent=2)+"\n")
     if not options.export_only:
         bpy.ops.wm.save_as_mainfile(filepath=str(project/manifest["source"]),compress=True)

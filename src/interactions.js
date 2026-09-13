@@ -4,6 +4,7 @@ import { apartmentWalkable, isApartment } from './residence.js';
 import residentLayout from './resident-layout.json' with { type:'json' };
 import { SINK_LAYOUT, sinkCenter } from './handwashing.js';
 import { bedSeatAngle } from './bed-motion.js';
+import { COMPUTER } from './computer.js';
 
 export const MEALS = {
   pancakes: { name: '枫糖松饼', duration: 12, amount: 32 },
@@ -112,10 +113,25 @@ export function planActivity(home, object, from, grid, height = 1, type = ITEM_M
   if (type === 'watch') return planWatch(home, object, from, grid);
   if (type === 'shower') return planShower(home, object, from, grid);
   if (type === 'washHands') return planHandwash(home, object, from, grid);
+  if (type === 'onlineChat' || object.type==='desk') return planComputer(home, object, from, grid);
   const path = findPath(home, from, object, grid);
   const end = path.at(-1);
   if (!end || Math.hypot(end.x - object.x, end.z - object.z) > 2.3) return { error: '暂时无法到达这件家具' };
   return { targetId: object.id, path, approach: end, distance: pathLength(path) };
+}
+
+export function planComputer(home, object, from, grid) {
+  const seat=localPoint(object,0,COMPUTER.seatZ), options=[];
+  for(const side of [-1,1]) {
+    const entry=localPoint(object,side*1.24,COMPUTER.seatZ);
+    const path=findPath(home,from,entry,grid),end=path.at(-1);
+    if(!end||Math.hypot(end.x-entry.x,end.z-entry.z)>.4||
+      !clearCorridor(home,end,seat,object.id))continue;
+    options.push({targetId:object.id,seatId:object.id,computerId:object.id,
+      path,approach:end,seat,rotation:object.rotation+Math.PI,seatTop:COMPUTER.seatTop,
+      floor:surfaceHeight(home,object.x,object.z),distance:pathLength(path)});
+  }
+  return options.sort((a,b)=>a.distance-b.distance)[0]||{error:'电脑椅旁边被挡住了，请留出入座通道'};
 }
 
 export function planWatch(home, television, from, grid) {
