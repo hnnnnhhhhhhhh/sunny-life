@@ -13,7 +13,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Browser Tests
+        run: npx playwright test tests/browser/coastal-release.spec.js tests/browser/resident-proportions.spec.js tests/browser/daily-life.spec.js tests/browser/apartment.spec.js tests/browser/resident-delivery.spec.js --shard=${{ matrix.shard }}/3
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-evidence-${{ matrix.shard }}
+          path: test-results
+          retention-days: 3
   build:
+    needs: browser-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -23,15 +46,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npx playwright install --with-deps chromium
-      - name: Browser Tests
-        run: npx playwright test tests/browser/coastal-release.spec.js tests/browser/resident-proportions.spec.js tests/browser/daily-life.spec.js tests/browser/apartment.spec.js tests/browser/resident-delivery.spec.js
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: browser-failure-evidence
-          path: test-results
-          retention-days: 3
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

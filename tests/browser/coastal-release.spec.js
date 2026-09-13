@@ -14,6 +14,8 @@ async function boot(page,seed) {
   await page.waitForTimeout(800);
 }
 async function furniture(page,id,label) {
+  await expect.poll(()=>diag(page).then(d=>Math.hypot(...d.camera.position.map((v,i)=>v-[21,26,30][i]))),
+    {timeout:15000}).toBeLessThan(.02);
   const p=await page.evaluate(id=>{
     const f=window.__sunny.state().game.home.furniture.find(f=>f.id===id);
     return window.__sunny.project(f.x,f.type==='tv'?1.5:0.9,f.z);
@@ -54,13 +56,13 @@ test('TV restores fun during viewing and queued toilet waits until it finishes',
   await page.waitForTimeout(1400);
   expect((await game(page)).sim.needs.fun).toBeGreaterThan(before+1);
   expect((await diag(page)).activity.type).toBe('watch');
+  await page.getByRole('button',{name:'暂停生活',exact:true}).click();
   await page.getByRole('button',{name:'回到家园视角',exact:true}).click();
   await page.waitForTimeout(800);
   await furniture(page,'toilet-1','上厕所');
   expect((await diag(page)).activity.type).toBe('watch');
   expect((await diag(page)).queue[0].targetId).toBe('toilet-1');
   await expect(page.getByRole('region',{name:'任务队列'})).toContainText('上厕所');
-  await page.getByRole('button',{name:'暂停生活',exact:true}).click();
   const paused=await game(page), progress=(await diag(page)).activity.progress;
   await page.waitForTimeout(700);
   expect((await game(page)).sim.needs).toEqual(paused.sim.needs);
