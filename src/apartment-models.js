@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import {box,cylinder,sphere,material,batchStaticModel} from './models.js';
+import {applySurface} from './surfaces.js';
 import {APARTMENT,apartmentRegions} from './residence.js';
+import {createTraffic} from './traffic.js';
+import {buildUrbanGround,neighborhoodWindowMaterial,addWindowSpill} from './urban-ground.js';
 
 const C={plaster:'#dedfd9',trim:'#f5f5ed',blue:'#94aeb8',glass:'#9fc1c7',
   metal:'#738e91',brick:'#b77966',wood:'#b49e81',leaf:'#57876d'};
@@ -35,7 +38,7 @@ function plant(group,x,y,z,size=1) {
 
 function glazing(group,x,y,z,width,height,panes=3) {
   const glass=box(group,x,y,z,width,height,.055,C.glass);
-  glass.material=material(C.glass,{roughness:.24,metalness:.15,emissive:'#ffd69d',emissiveIntensity:0});
+  glass.material=neighborhoodWindowMaterial(Math.round(x*3+y*2+z));
   glass.material.userData.nightWindow=true;
   for(const dx of [-width/2,width/2])box(group,x+dx,y,z+.045,.055,height+.08,.07,C.trim);
   for(const dy of [-height/2,height/2])box(group,x,y+dy,z+.045,width+.08,.055,.07,C.trim);
@@ -92,8 +95,9 @@ function storey(group,y,width=12) {
   aircon(group,5.1,y+2.45,4.35);
 }
 
-function distantBuilding(group,x,z,width,floors,color) {
+function distantBuilding(group,x,z,width,floors,color,rotation=0,shop=false) {
   const building=new THREE.Group();building.position.set(x,APARTMENT.streetY,z);
+  building.rotation.y=rotation;
   box(building,0,floors*1.55,0,width,floors*3.1,6,color);
   for(let floor=0;floor<floors;floor++) {
     const y=floor*3.1;
@@ -103,16 +107,45 @@ function distantBuilding(group,x,z,width,floors,color) {
       if((floor+Math.round(wx))%2===0)aircon(building,wx+.7,y+.55,3.13);
     }
   }
+  box(building,0,floors*3.1+.11,0,width+.4,.16,6.35,C.trim);
+  box(building,0,floors*3.1+.22,0,width-.4,.07,5.6,'#80908b');
+  for(const side of [-1,1]){
+    const wall=new THREE.Group();wall.position.x=side*(width/2+.02);wall.rotation.y=side*Math.PI/2;
+    for(let floor=0;floor<floors;floor++)for(const offset of [-1.6,1.6])
+      glazing(wall,offset,floor*3.1+1.65,0,1.55,1.7,2);
+    building.add(wall);
+  }
+  const rear=new THREE.Group();rear.rotation.y=Math.PI;
+  for(let floor=0;floor<floors;floor++)for(let wx=-width/2+1.5;wx<width/2;wx+=2.6)
+    glazing(rear,wx,floor*3.1+1.6,3.035,1.7,1.8,2);
+  building.add(rear);
+  if(shop){
+    for(const wx of [-width*.25,width*.25]){
+      glazing(building,wx,1.35,3.13,width*.39,2.35,2);
+      box(building,wx,2.75,3.46,width*.43,.18,.95,shop.color,.03);
+      for(let strip=0;strip<6;strip++)
+        box(building,wx-width*.215+(strip+.5)*width*.43/6,2.64,3.91,width*.43/6,.20,.05,strip%2?C.trim:shop.color);
+    }
+    box(building,0,1.2,3.18,.78,2.4,.09,'#526c6c');
+    box(building,.24,1.2,3.25,.035,.28,.05,'#d5cfad');
+    for(const wx of [-width*.42,width*.42])plant(building,wx,0,3.8,.85);
+  }
   group.add(building);
+  return building;
 }
 
 export function createApartmentEnvironment() {
   const root=new THREE.Group(),solid=new THREE.Group(),upper=new THREE.Group();
   const streetLights=[];
+  const traffic=createTraffic();
+  root.add(traffic.root);
+  const opposite=[];
+  const shopSigns=[];
   root.name='QingheApartmentBlock';
   const y=APARTMENT.streetY;
-  box(solid,0,y-.18,0,220,.35,220,'#c2cbc6');
-  box(solid,0,y+.02,13.7,180,.035,7.2,'#929d9c');
+  const streets=buildUrbanGround(solid,y);
+  const spill=addWindowSpill(root,y);
+  box(solid,0,y+.02,13.7,180,.035,7.2,'#586767');
   for(const z of [9.2,18.2]) {
     box(solid,0,y+.11,z,180,.20,1.8,'#d7dbd2');
     box(solid,0,y+.22,z+(z<12?.9:-.9),180,.045,.12,C.trim);
@@ -136,6 +169,36 @@ export function createApartmentEnvironment() {
   }
   for(const entry of [[-22,-16,9,4,'#aabbb5'],[-10,-22,9,5,'#bd9787'],[3,-23,11,4,'#a7b5bc'],
     [17,-18,10,5,'#c6c5b9'],[27,-2,8,3,'#b89789'],[-25,1,8,3,'#a4b2b2']])distantBuilding(solid,...entry);
+  distantBuilding(solid,32,-22,16,2,'#97aaa4',0,{color:'#8d8197'});
+  const mallCanvas=document.createElement('canvas');mallCanvas.width=512;mallCanvas.height=96;
+  const mallCtx=mallCanvas.getContext('2d');mallCtx.fillStyle='#637b77';mallCtx.fillRect(0,0,512,96);
+  mallCtx.fillStyle='#f1f4ea';mallCtx.font='500 42px sans-serif';mallCtx.textAlign='center';mallCtx.fillText('青禾里 · 商场',256,63);
+  const mallTexture=new THREE.CanvasTexture(mallCanvas);mallTexture.colorSpace=THREE.SRGBColorSpace;shopSigns.push(mallTexture);
+  const mallSign=new THREE.Mesh(new THREE.PlaneGeometry(7,1.3),new THREE.MeshStandardMaterial({map:mallTexture,roughness:.85}));
+  mallSign.position.set(32,y+5,-18.93);mallSign.userData.disposable=mallSign.userData.ownMaterial=true;root.add(mallSign);
+  const shops=[
+    {name:'街角咖啡',color:'#62827c'},{name:'青禾花店',color:'#b9867b'},
+    {name:'邻里书店',color:'#839dba'},{name:'便利商店',color:'#b6a168'},
+  ];
+  for(let i=0;i<7;i++){
+    const x=(i-3)*11.6,shop=shops[i%shops.length],floors=i%3===0?3:2,width=10.3;
+    distantBuilding(solid,x,25,width,floors,['#c4c7bb','#99afb4','#c9a391','#bac7bd'][i%4],Math.PI,shop);
+    opposite.push({x,z:25,width,floors});
+    const canvas=document.createElement('canvas');canvas.width=256;canvas.height=64;
+    const ctx=canvas.getContext('2d');ctx.fillStyle=shop.color;ctx.fillRect(0,0,256,64);
+    ctx.fillStyle='#ffffff';ctx.font='500 30px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(shop.name,128,34);
+    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;shopSigns.push(texture);
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(2.6,.65),new THREE.MeshStandardMaterial({map:texture,roughness:.85}));
+    sign.position.set(x,y+3.18,21.94);sign.rotation.y=Math.PI;
+    sign.userData.disposable=sign.userData.ownMaterial=true;root.add(sign);
+  }
+  for(const x of [-30,-18,-6,6,18,30]){
+    box(solid,x,y+.18,18.4,1.45,.2,1.3,'#879581',.08);
+    cylinder(solid,x,y+1.15,18.4,.12,.18,2.2,'#8c8272',8);
+    sphere(solid,x,y+2.6,18.4,.85,1.15,.8,'#648d76',true);
+    box(solid,x+2.7,y+.43,19,.95,.08,.4,C.wood,.035);
+    for(const dx of [-.36,.36])box(solid,x+2.7+dx,y+.21,19,.05,.42,.33,C.metal);
+  }
   for(let floor=0;floor<2;floor++)storey(solid,y+.25+floor*APARTMENT.storey);
   for(let floor=0;floor<3;floor++) {
     const base=y+.25+floor*APARTMENT.storey;
@@ -192,34 +255,35 @@ export function createApartmentEnvironment() {
   const nightMaterials=new Set();
   root.traverse(node=>{if(node.material?.userData.nightWindow)nightMaterials.add(node.material);});
   return {root,upper,surfaces:[floorSurface],setExterior(value){upper.visible=value;},
+    update(delta){traffic.update(delta);},
     setNight(amount){
-      for(const mat of nightMaterials)mat.emissiveIntensity=amount*.65;
+      traffic.setNight(amount);
+      for(const mat of nightMaterials)mat.emissiveIntensity=amount*(mat.userData.windowVariant===undefined?.45:.12+mat.userData.windowVariant*.12);
       for(const light of streetLights){light.intensity=amount*5;light.visible=amount>0;}
+      for(const [i,light] of spill.entries()){light.intensity=amount*(i%2?16:22);light.visible=amount>0;}
     },
-    dispose(){signTexture.dispose();},
-    diagnostics(){return {style:'urban-apartment',floor:3,storeys:3,exterior:upper.visible};}};
+    dispose(){signTexture.dispose();shopSigns.forEach(texture=>texture.dispose());},
+    diagnostics(){return {style:'urban-apartment',floor:3,storeys:3,exterior:upper.visible,opposite,streets,
+      mall:{x:32,z:-22},windowSpill:spill.map(l=>({intensity:l.intensity,penumbra:l.penumbra})),traffic:traffic.diagnostics()};}};
 }
 
 export function dressApartment(house,home) {
   const front=house.userData.wallGroups.find(g=>g.wall.id==='exterior-south')?.full;
   if(front)for(const side of [-1,1]) {
     const pane=box(front,side*.8,1.48,4.49,.34,2.36,.045,C.glass);
+    pane.castShadow=false;
     pane.material=material(C.glass,{transparent:true,opacity:.38,roughness:.15,depthWrite:false});
     box(front,side*.64,1.48,4.53,.035,2.36,.055,C.trim);
   }
   const back=house.userData.wallGroups.find(g=>g.wall.id==='exterior-north')?.full;
   if(back) {
+    for(const child of back.children)if(child.isMesh&&child.material.userData.surface==='plaster'){
+      const tint=new THREE.Color(home.wallColor).multiply(new THREE.Color('#d5c2b0'));
+      child.material=material(`#${tint.getHexString()}`);
+      applySurface(child,'brick');
+    }
     for(let i=0;i<9;i++)box(back,2.4,2.98-i*.075,-4.35,4.55,.045,.045,C.wood);
     box(back,-.7,2.25,-4.22,1.3,.8,.35,'#c6cec4',.025);
-  }
-  const west=house.userData.wallGroups.find(g=>g.wall.id==='exterior-west')?.full;
-  if(west) {
-    const curtain=new THREE.Group();curtain.position.set(-5.78,0,1.8);
-    for(const end of [-1,1])for(let i=0;i<5;i++) {
-      const panel=box(curtain,0,1.84,end*(1.4+i*.10),.045,2.55,.13,'#c3bcb1');
-      panel.position.x+=Math.sin(i*2)*.04;
-    }
-    west.add(curtain);
   }
   const divider=house.userData.wallGroups.find(g=>g.wall.id==='bedroom-divider')?.full;
   if(divider) {
@@ -237,7 +301,7 @@ export function dressApartment(house,home) {
   const fittings=new THREE.Group();
   fittings.name='ApartmentFittings';
   for(const region of [{x:-4.25,z:-2.75,w:3.45,d:3.4},{x:7.2,z:0,w:2.35,d:8.95}]) {
-    box(fittings,region.x,.259,region.z,region.w,.012,region.d,'#b9c9c5');
+    applySurface(box(fittings,region.x,.259,region.z,region.w,.012,region.d,'#b9c9c5'),'stone');
     for(let z=-region.d/2;z<=region.d/2;z+=.5)box(fittings,region.x,.267,region.z+z,region.w,.004,.012,'#dfe5de');
   }
   pipe(fittings,[-3.9,2.72,5.6],[-1.2,2.72,5.6],.025,C.metal);

@@ -8,6 +8,8 @@ import { createTelevision } from './activity-props.js';
 import { SINK_LAYOUT, sinkCenter } from './handwashing.js';
 import { isApartment } from './residence.js';
 import { COMPUTER, createComputerScreen } from './computer.js';
+import {applySurface} from './surfaces.js';
+import {createNeighborhoodModel} from './neighborhood-assets.js';
 
 const geometries = new Map(), materials = new Map();
 const geometry = (key, create) => {
@@ -167,7 +169,7 @@ export function furnitureModel(type, color) {
     cylinder(g, 0, 1.44, 0, 0.33, 0.33, 0.015, '#f9edc8');
     sphere(g, 0, 1.85, 0, 0.04, 0.06, 0.04, '#a78e58');
   } else if (type === 'rug') {
-    box(g, 0, 0.021, 0, 3.8, 0.04, 3.2, color, 0.035);
+    applySurface(box(g, 0, 0.021, 0, 3.8, 0.04, 3.2, color, 0.035),'linen');
     for (let i = -7; i <= 7; i++) {
       box(g, i * 0.24, 0.043, 0, 0.012, 0.003, 3.05, '#ddcfb4');
     }
@@ -209,7 +211,7 @@ export function furnitureModel(type, color) {
   } else if (type === 'desk') {
     for(const x of [-.77,.77])for(const z of [-.61,.02])
       box(g,x,.445,z,.065,.89,.065,'#6e8580',.012);
-    box(g,0,.92,-.3,1.8,.08,.8,color,.025);
+    applySurface(box(g,0,.92,-.3,1.8,.08,.8,color,.025),'oak');
     box(g,0,.982,-.46,.34,.035,.20,'#4e6464',.012);
     box(g,0,1.09,-.49,.045,.22,.035,'#4e6464',.008);
     box(g,0,1.31,-.47,.93,.60,.06,'#43585c',.018).name='ComputerMonitor';
@@ -243,7 +245,7 @@ export function furnitureModel(type, color) {
     littlePlant(g, 1.62, 1.025, -0.1, 0.75);
   } else if (type === 'dining') {
     legs(g, 1.48, 0.7, 0.79);
-    box(g, 0, 0.83, 0, 1.9, 0.11, 1.05, color, 0.12);
+    applySurface(box(g, 0, 0.83, 0, 1.9, 0.11, 1.05, color, 0.12),'oak');
     for (const z of [-0.76, 0.76]) {
       const chair = new THREE.Group();
       legs(chair, 0.44, 0.4, 0.5);
@@ -408,12 +410,27 @@ function windowPanel(g, x, z, width, horizontal = true, elevation = 0) {
   frame.userData.window = { bottom: elevation + WINDOW.bottom, top: elevation + WINDOW.top, width };
   const glass = box(frame, 0, WINDOW.center, 0, width - WINDOW.frame, WINDOW.height - WINDOW.frame, 0.035, '#c7e2dd');
   glass.name = 'WindowGlass';
+  glass.castShadow = false;
   glass.material = material('#c7e2dd', { transparent: true, opacity: 0.4, roughness: 0.15 });
   for (const offset of [-width / 2, 0, width / 2]) box(frame, offset, WINDOW.center, 0.045, WINDOW.frame, WINDOW.height + WINDOW.frame, 0.11, '#efeddf');
   for (const y of [WINDOW.bottom, WINDOW.center, WINDOW.top]) box(frame, 0, y, 0.045, width + WINDOW.frame, WINDOW.frame, 0.11, '#efeddf');
   box(frame, 0, WINDOW.bottom - 0.035, 0.06, width + 0.28, 0.12, 0.31, '#d7c6a5', 0.02);
-  for (const side of [-1, 1]) for (let i = 0; i < 3; i++) {
-    cylinder(frame, side * (width / 2 - 0.06) + (i - 1) * 0.045, WINDOW.center, 0.2, 0.05, 0.05, WINDOW.height - 0.07, '#e9e5d2', 10);
+  const inside=horizontal?(z>0?-1:1):(x>0?-1:1);
+  for(const side of [-1,1]){
+    box(frame,side*(width/2-.09),WINDOW.center,inside*.10,.025,WINDOW.height-.13,.025,'#a8b4ae');
+    box(frame,side*.12,WINDOW.center,inside*.13,.035,.22,.055,'#84958e',.012);
+    box(frame,side*.12,WINDOW.center+.08,inside*.17,.035,.025,.10,'#bfc8bd',.009);
+  }
+  for(const y of [WINDOW.bottom+.09,WINDOW.top-.09])
+    box(frame,0,y,inside*.10,width-.16,.025,.025,'#bac5bc');
+  const curtain=createNeighborhoodModel('curtains');
+  if(curtain){
+    curtain.scale.set(width+.32,WINDOW.top+.1,1.8);
+    curtain.position.set(0,.06,inside*.23);
+    if(inside<0)curtain.rotation.y=Math.PI;
+    frame.add(curtain);
+  }else for (const side of [-1, 1]) for (let i = 0; i < 3; i++) {
+    cylinder(frame, side * (width / 2 - 0.06) + (i - 1) * 0.045, WINDOW.center, inside*.2, 0.05, 0.05, WINDOW.height - 0.07, '#e9e5d2', 10);
   }
   frame.position.set(x, elevation, z);
   if (!horizontal) frame.rotation.y = Math.PI / 2;
@@ -437,6 +454,7 @@ export function houseModel(home, roof = false) {
       const tw = w / cols, td = d / rows;
       if (home.floor === 'tile' && (ix + iz) % 2) col.set('#e2e3d4');
       const tile = box(g, region.x1 + tw * (ix + 0.5), 0.225, region.z1 + td * (iz + 0.5), tw - 0.014, 0.05, td - 0.014, `#${col.getHexString()}`);
+      applySurface(tile,region.id==='bathroom'||home.floor==='tile'?'stone':'oak');
       tile.userData.floorId = region.id;
       g.userData.floorSurfaces.push(tile);
     }
@@ -451,7 +469,8 @@ export function houseModel(home, roof = false) {
   for (const wall of allWalls(home)) {
     const full = new THREE.Group(), low = new THREE.Group(), axis = wallAxis(wall);
     for (const part of wallParts(wall)) {
-      box(full, part.x, HOUSE_FLOOR + (part.bottom + part.top) / 2, part.z, part.width, part.top - part.bottom, part.depth, home.wallColor);
+      const mesh=box(full, part.x, HOUSE_FLOOR + (part.bottom + part.top) / 2, part.z, part.width, part.top - part.bottom, part.depth, home.wallColor);
+      applySurface(mesh,'plaster');
     }
     for (const part of wallParts(wall, true)) {
       box(low, part.x, HOUSE_FLOOR + 0.12, part.z, part.width, 0.24, part.depth, home.wallColor);

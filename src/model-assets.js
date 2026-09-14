@@ -4,6 +4,8 @@ import manifest from './assets/blender-manifest.json';
 import worldManifest from './assets/world-manifest.json';
 import suppliedManifest from './assets/supplied-manifest.json';
 import {downloadAsset} from './asset-download.js';
+import {dressFurnitureSurfaces} from './surfaces.js';
+import {loadNeighborhoodAssets,createNeighborhoodModel,neighborhoodAssetStatus} from './neighborhood-assets.js';
 
 const templates = new Map();
 const worldTemplates = new Map();
@@ -48,6 +50,7 @@ export async function loadBlenderModels() {
   });
   loading = (async()=>{
     await loadSuppliedModels(loader);
+    await loadNeighborhoodAssets();
     await Promise.all([
       ...loadCollection(manifest, templates, failures),
       ...loadCollection(worldManifest, worldTemplates, worldFailures),
@@ -117,10 +120,15 @@ function cloneModel(template, type, color, source='blender') {
     if(color)node.material = Array.isArray(node.material) ? node.material.map(m => tint(m, color)) : tint(node.material, color);
   });
   model.add(instance);
+  if(templates.has(type)||suppliedTemplates.has(type))dressFurnitureSurfaces(model,type);
   return model;
 }
 
 export function createBlenderFurniture(type, color) {
+  if(type==='sofa'){
+    const model=createNeighborhoodModel(type,color);
+    if(model)return model;
+  }
   if(suppliedTemplates.has(type))return cloneModel(suppliedTemplates.get(type),type,color,'supplied');
   return cloneModel(templates.get(type), type, color);
 }
@@ -139,6 +147,7 @@ export function blenderAssetStatus() {
     loaded: [...templates.keys()],
     failed: Object.fromEntries(failures),
     total: manifest.assets.length,
+    neighborhood:neighborhoodAssetStatus(),
     supplied:{loaded:[...suppliedTemplates.keys()],failed:Object.fromEntries(suppliedFailures),total:suppliedManifest.assets.length},
     scenery: {
       loaded: [...worldTemplates.keys()],

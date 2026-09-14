@@ -108,6 +108,10 @@
 .hud-neighbors small { margin-left: auto; font-size: 9px; color: #a1ab96; }
 .hud-neighbors .hud-tool { width: 25px; height: 24px; flex-basis: 25px; }
 .status-dot.busy { background: #c3a565; }
+.need[data-level="critical"] meter::-webkit-meter-bar { background: #f1d9d6; }
+.need[data-level="warning"] meter::-webkit-meter-bar { background: #f0e3cc; }
+.need[data-level="critical"] strong { color: #cb5c52; }
+.need[data-level="warning"] strong { color: #b77a25; }
 .time-controls { position: absolute; z-index: 5; left: 50%; bottom: 16px; transform: translateX(-50%); width: 214px; padding: 7px 12px 5px; border-radius: 6px; }
 .time-reading { display: flex; align-items: center; justify-content: center; gap: 7px; }
 .time-reading svg { color: #b39b67; }

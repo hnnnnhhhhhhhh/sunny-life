@@ -33,7 +33,7 @@ test('extinguished lights leave the render traversal and return at night',()=>{
 });
 
 test('computer supports optional reading, rotated seat access and rejects blocked chairs',()=>{
-  assert.deepEqual(activityTypes('desk'),['onlineChat','read']);
+  assert.deepEqual(activityTypes('desk'),['onlineChat','read','jobSearch']);
   const game=newApartmentGame(),desk=game.home.furniture.find(f=>f.type==='desk');
   assert.equal(planComputer(game.home,desk,game.sim,navigationGrid(game.home)).error,undefined);
   for(const rotation of [0,Math.PI/2,Math.PI,Math.PI*1.5]) {

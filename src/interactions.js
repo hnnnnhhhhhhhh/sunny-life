@@ -7,8 +7,11 @@ import { bedSeatAngle } from './bed-motion.js';
 import { COMPUTER } from './computer.js';
 
 export const MEALS = {
-  pancakes: { name: '枫糖松饼', duration: 12, amount: 32 },
-  salad: { name: '田园沙拉', duration: 10, amount: 26 },
+  pancakes: { name: '枫糖松饼', duration: 12, amount: 38, price: 12 },
+  salad: { name: '田园沙拉', duration: 10, amount: 28, price: 8 },
+  noodles: { name: '蔬菜面条', duration: 12, amount: 48, price: 10 },
+  steak: { name: '香煎牛排', duration: 18, amount: 82, price: 45 },
+  toast: { name: '家常吐司', duration: 8, amount: 22, price: 0 },
 };
 export const STAGE_LABELS = { approach: '前往座位', seating: '正在入座', active: '享用餐点', standing: '用餐结束', cancelling: '结束当前活动' };
 

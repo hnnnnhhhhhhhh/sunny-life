@@ -1,0 +1,22 @@
+ISOMETRIC OFFICE
+
+Author: Companion_Cube
+https://sketchfab.com/Companion_Cube
+Source:
+https://sketchfab.com/3d-models/isometric-office-d31464eed8044190911b221648aca432
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Sunny Life adaptations:
+- Resize texture maps to 512px and encode as WebP.
+- Remove one desk assembly for an interactive replacement.
+- Flatten hierarchy and merge compatible static meshes.
+- Fit the office to the resident scale.
+- Add a functional desk, cubicle partitions, public cafe and restroom.
+- Generate navigation obstacles from actual mesh triangles.
+
+The original author does not endorse this adaptation.
+Original source SHA-256:
+c383452b2fa663075a62a1ba775ed687781f848e7bcb33a7add304448ad928ab
+The supplied original file remains unchanged outside this repository.
+Rebuild script: scripts/office-assets.mjs.

@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import { loadBlenderModels } from './model-assets.js';
 import { loadResidentAssets } from './characters.js';
+import { loadSurfaceAssets } from './surfaces.js';
+import {loadGame} from './game.js';
+import {atWork} from './career.js';
+import {loadOfficeAssets} from './office-assets.js';
 import './index.css';
 import './hud.css';
 
@@ -25,6 +29,16 @@ loadResidentAssets((loaded,total)=>{
   root.render(<div className="world-loading" role="status"><strong>正在加载居民 · {progress}%</strong><progress aria-label="居民资源加载进度" max={100} value={progress} style={{width:200,maxWidth:'70%'}} /></div>);
 }).then(async resident => {
   root.render(<div className="world-loading" role="status"><strong>正在布置家园</strong></div>);
+  await loadSurfaceAssets();
   const status=await loadBlenderModels();
-  root.render(<GameBoundary><App modelWarning={!resident.loaded || Object.keys(status.failed).length + Object.keys(status.scenery.failed).length + Object.keys(status.supplied.failed).length > 0} /></GameBoundary>);
+  let restored;
+  try{restored=loadGame(window.localStorage).data;}catch{/* Storage may be disabled. */}
+  if(restored&&atWork(restored)){
+    root.render(<div className="world-loading" role="status"><strong>正在返回办公室</strong></div>);
+    try{await loadOfficeAssets();}catch{
+      root.render(<div className="world-loading"><strong>办公室暂未加载成功</strong><p>工作存档已保留。</p><button onClick={()=>location.reload()}>重试</button></div>);
+      return;
+    }
+  }
+  root.render(<GameBoundary><App modelWarning={!resident.loaded || !!status.neighborhood.error || Object.keys(status.failed).length + Object.keys(status.scenery.failed).length + Object.keys(status.supplied.failed).length > 0} /></GameBoundary>);
 });

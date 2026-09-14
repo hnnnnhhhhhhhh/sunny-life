@@ -50,7 +50,7 @@ test('new visitors create their own resident, resume, and do not share saves',as
 test('TV restores fun during viewing and queued toilet waits until it finishes',async({page})=>{
   const seed=newGame(); seed.sim.autonomy=false; seed.sim.needs.fun=25; seed.sim.needs.bladder=20;
   await boot(page,seed);
-  await furniture(page,'tv-1','看一会儿电影');
+  await furniture(page,'tv-1','自然纪录片');
   await expect.poll(()=>diag(page).then(d=>d.activity?.stage),{timeout:15000}).toBe('active');
   const before=(await game(page)).sim.needs.fun;
   await page.waitForTimeout(1400);
@@ -79,7 +79,7 @@ test('TV restores fun during viewing and queued toilet waits until it finishes',
 test('queue can reorder, remove, clear and cancellation retains earned benefits',async({page})=>{
   const seed=newGame(); seed.sim.autonomy=false; seed.sim.needs.fun=20;
   await boot(page,seed);
-  await furniture(page,'tv-1','看一会儿电影');
+  await furniture(page,'tv-1','自然纪录片');
   await expect.poll(()=>diag(page).then(d=>d.activity?.stage),{timeout:15000}).toBe('active');
   await page.getByRole('button',{name:'回到家园视角',exact:true}).click(); await page.waitForTimeout(800);
   await furniture(page,'toilet-1','上厕所');

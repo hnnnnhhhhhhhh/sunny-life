@@ -2,6 +2,16 @@ import PF from 'pathfinding';
 import { WORLD_COLLIDERS, restoreWorldPosition, terrainHeight, terrainSurface, terrainWalkable } from './terrain.js';
 import { allWalls, EXTERIOR_IDS, exteriorRecords, floorRegions, onFloor, PLOT, roomWalls, setWallOpening, sharedWall, wallAxis, wallColliders, wallParts } from './architecture.js';
 import { APARTMENT_COLLIDERS, apartmentPlaceable, apartmentWalkable, isApartment } from './residence.js';
+import {advanceCareer,newCareer,validateCareer,atWork,jobFor} from './career.js';
+import {advanceNeeds,newWellbeing,validateWellbeing} from './needs.js';
+import {newLife,advanceLife,validateLife,HOMES,housingError} from './life.js';
+import {newDialogue,validateDialogue} from './dialogue.js';
+import {beginProject} from './workplace.js';
+import {newCalendar,validateCalendar} from './calendar.js';
+import {newFinance,advanceFinance,validateFinance} from './finance.js';
+import {newSocial,advanceSocial,validateSocial} from './social.js';
+import {newEmotions,advanceEmotions,validateEmotions} from './emotions.js';
+import {advanceAttendance,newAttendance} from './attendance.js';
 
 export const SAVE_KEY = 'sunny-life.save.v1';
 export const CATALOG = [
@@ -15,7 +25,7 @@ export const CATALOG = [
   { type: 'tv', name: '周末影音柜', category: 'living', price: 1660, width: 2.1, depth: 0.55, color: '#bc956b', colors: ['#bc956b', '#78614d', '#e4dfd3'], detail: '原木矮柜 · 轻薄屏幕', activity: 'watch' },
   { type: 'bed', name: '好梦双人床', category: 'bedroom', price: 1850, width: 2.25, depth: 2.9, color: '#b1b998', colors: ['#b1b998', '#c8a49b', '#a3b6c2', '#e3cfb2'], detail: '棉质床品 · 软包床头', activity: 'sleep' },
   { type: 'nightstand', name: '床边小方柜', category: 'bedroom', price: 260, width: 0.65, depth: 0.6, color: '#c09970', colors: ['#c09970', '#eee4d2', '#7c6b58'], detail: '双层收纳 · 实木拉手' },
-  { type: 'desk', name: '日常电脑桌', category: 'bedroom', price: 780, width: 1.8, depth: 1.5, color: '#c6aa82', colors: ['#c6aa82', '#e8e1d2', '#96745b'], detail: '台式电脑 · 键盘 · 配套座椅', activity: 'onlineChat', activities:['onlineChat','read'] },
+  { type: 'desk', name: '日常电脑桌', category: 'bedroom', price: 780, width: 1.8, depth: 1.5, color: '#c6aa82', colors: ['#c6aa82', '#e8e1d2', '#96745b'], detail: '台式电脑 · 键盘 · 配套座椅', activity: 'onlineChat', activities:['onlineChat','read','jobSearch'] },
   { type: 'kitchen', name: '晨光整体厨房', category: 'kitchen', price: 2400, width: 3.9, depth: 0.95, color: '#a9b8aa', colors: ['#a9b8aa', '#d6cab1', '#8ca4aa'], detail: '石材台面 · 烤箱 · 微波炉', activity: 'eat', activities:['eat','washHands'] },
   { type: 'dining', name: '两个人的餐桌', category: 'kitchen', price: 960, width: 1.9, depth: 1.9, color: '#cca476', colors: ['#cca476', '#e3d7bf', '#906d53'], detail: '圆角餐桌 · 一桌两椅', activity: 'eat' },
   { type: 'fridge', name: '双门冷藏冰箱', category: 'kitchen', price: 1200, width: 0.9, depth: 0.85, color: '#d4dfcf', colors: ['#d4dfcf', '#e4c0a5', '#99b9c2'], detail: '金属门板 · 双门冷藏', activity: 'eat' },
@@ -48,10 +58,14 @@ export const ACTIVITIES = {
   garden: { label: '照顾植物', status: '照料心爱的小植物', need: 'fun', amount: 22 },
   chat: { label: '打个招呼', status: '和邻居聊聊天', need: 'social', amount: 30 },
   onlineChat: { label:'网上聊天', status:'和好友网上聊天', need:'social', amount:30 },
+  jobSearch: {label:'查找工作',status:'浏览招聘信息',need:'fun',amount:0},
   toilet: { label: '上厕所', status: '正在如厕', need: 'bladder', amount: 72 },
   shower: { label: '洗澡', status: '正在淋浴', need: 'hygiene', amount: 65 },
   fish: { label: '钓鱼', status: '静待鱼儿上钩', need: 'fun', amount: 24 },
   washHands: { label:'洗手', status:'正在洗手', need:'hygiene', amount:3 },
+  laundryWash: { label:'洗衣服', status:'正在洗衣服', need:'hygiene', amount:0 },
+  laundryHang: { label:'晾晒衣物', status:'正在晾晒衣物', need:'hygiene', amount:0 },
+  guest: {label:'与朋友交流',status:'面对面交谈',need:'social',amount:0},
 };
 
 export const NEED_DEFAULTS = { hunger: 78, energy: 86, social: 68, fun: 92, hygiene: 82, bladder: 85 };
@@ -68,6 +82,29 @@ export function advanceSim(sim, minutes) {
   const needs = Object.fromEntries(Object.entries(sim.needs).map(([key,value]) =>
     [key, Math.max(0, value - (NEED_DECAY[key] || 0) * minutes)]));
   return { ...sim, time: time % 1440, day: Math.min(99999, sim.day + Math.floor(time / 1440)), needs };
+}
+
+export function advanceGame(game,minutes,context={}){
+  if(!Number.isFinite(minutes)||minutes<=0)return game;
+  let next=game,remaining=minutes;
+  while(remaining>1e-8){
+    const step=Math.min(1,remaining),before=next;
+    const sleeping=!!next.life?.sleep&&next.life.sleep.elapsed<360&&(context.sleeping??true);
+    next=advanceCareer(next,step,(sim,dt,officeContext)=>advanceNeeds(sim,dt,next.avatar.traits,(s,m)=>{
+      const result=advanceSim(s,m);
+      if(!sleeping)return result;
+      const needs={...result.needs};
+      for(const key of ['hunger','bladder','social','fun'])needs[key]=Math.max(0,s.needs[key]-NEED_DECAY[key]*m*.3);
+      return {...result,needs};
+    },officeContext||context));
+    if(next.life)next=advanceLife(before,next,step,context);
+    next=advanceFinance(next,jobFor(next.career.jobId)?.salary||0);
+    next=advanceAttendance(before,next,jobFor(before.career.jobId));
+    next=advanceEmotions(next,step,context);
+    next=advanceSocial(next,step,context);
+    remaining-=step;
+  }
+  return next;
 }
 
 export const DEFAULT_AVATAR = {
@@ -110,7 +147,11 @@ export function newGame(onboarding = true) {
     },
     avatar: structuredClone(DEFAULT_AVATAR),
     budget: 28650,
-    sim: { x: -0.45, z: 2.55, time: 624, day: 1, autonomy: true, catches: [], needs: { ...NEED_DEFAULTS } },
+    career:newCareer(),
+    life:newLife(),
+    dialogue:newDialogue(),
+    calendar:newCalendar(),finance:newFinance(),social:newSocial(),emotions:newEmotions(),
+    sim: { x: -0.45, z: 2.55, time: 624, day: 1, autonomy: true, catches: [], wellbeing:newWellbeing(),needs: { ...NEED_DEFAULTS } },
   };
   const bathroom = bathroomAddition(game.home);
   if (!bathroom.error) game.home = bathroom.home;
@@ -147,14 +188,40 @@ export function newApartmentGame(onboarding = true) {
 }
 
 export function switchResidence(game,residence) {
+  if(atWork(game)||game.life?.shopping||game.social?.visit)return game;
   if(!['apartment','coastal'].includes(residence))return game;
   if((isApartment(game.home)?'apartment':'coastal')===residence)return game;
   const backup=game.residenceBackup;
   const saved=backup&&(isApartment(backup.home)?'apartment':'coastal')===residence?backup:null;
   const fresh=residence==='apartment'?newApartmentGame():newGame();
-  return {...game,home:saved?.home||fresh.home,budget:saved?.budget??fresh.budget,
+  return {...game,home:saved?.home||fresh.home,
+    life:{...game.life,sleep:null},
     sim:{...game.sim,x:saved?.x??fresh.sim.x,z:saved?.z??fresh.sim.z},
     residenceBackup:{home:game.home,budget:game.budget,x:game.sim.x,z:game.sim.z}};
+}
+
+export function upgradeHousing(game) {
+  if(housingError(game,jobFor(game.career.jobId)?.salary||0))return game;
+  const target=HOMES[game.life.housing],fresh=newGame();
+  // Keep original furnishing IDs and layout while expanding the usable footprint.
+  const rooms=(game.home.rooms||[]).filter(r=>!(r.x1>=-target.width/2&&r.x2<=target.width/2&&r.z1>=-target.depth/2&&r.z2<=target.depth/2));
+  const removedRooms=new Set((game.home.rooms||[]).filter(r=>!rooms.includes(r)).map(r=>r.id));
+  const home={...fresh.home,...game.home,residence:'coastal',name:target.name,
+    width:target.width,depth:target.depth,rooms,removedExterior:[],exteriorEdits:{},
+    walls:game.home.walls.filter(w=>!removedRooms.has(w.roomId))};
+  home.furniture=game.home.furniture.map(f=>({...f}));
+  for(const object of home.furniture){
+    if(!validatePlacement(home,object,object.id))continue;
+    const positions=[];
+    for(let x=-9;x<=9;x+=.5)for(let z=-8;z<=8;z+=.5)
+      positions.push({x,z,d:Math.hypot(x-object.x,z-object.z)});
+    const free=positions.sort((a,b)=>a.d-b.d).find(p=>!validatePlacement(home,{...object,x:p.x,z:p.z},object.id));
+    if(!free)return game;
+    object.x=free.x;object.z=free.z;
+  }
+  return {...game,home,budget:game.budget-target.price,residenceBackup:undefined,
+    life:{...game.life,housing:game.life.housing+1,sleep:null},
+    sim:{...game.sim,x:0,z:0}};
 }
 
 export const worldColliders = home => isApartment(home)?APARTMENT_COLLIDERS:WORLD_COLLIDERS;
@@ -299,6 +366,7 @@ export function validateSave(data) {
     (data.residenceBackup===undefined||(data.residenceBackup&&
       isApartment(data.residenceBackup.home)!==isApartment(home)&&
       validateSave({...data,residenceBackup:undefined,home:data.residenceBackup.home,budget:data.residenceBackup.budget,
+        life:data.life?{...data.life,sleep:null}:undefined,
         sim:{...sim,x:data.residenceBackup.x,z:data.residenceBackup.z}}))) &&
     (data.onboarding === undefined || typeof data.onboarding === 'boolean') &&
     finiteBetween(home.width, 10, 16) && finiteBetween(home.depth, 8, 14) &&
@@ -337,17 +405,35 @@ export function validateSave(data) {
     (sim.catches === undefined || (Array.isArray(sim.catches) && sim.catches.length <= 200 &&
       sim.catches.every(c => c && ['silver','perch','golden'].includes(c.type) && finiteBetween(c.day,1,99999)))) &&
     sim.needs && ['hunger', 'energy', 'social', 'fun'].every(n => finiteBetween(sim.needs[n], 0, 100)) &&
-    ['hygiene', 'bladder'].every(n => sim.needs[n] === undefined || finiteBetween(sim.needs[n], 0, 100));
+    ['hygiene', 'bladder'].every(n => sim.needs[n] === undefined || finiteBetween(sim.needs[n], 0, 100)) &&
+    validateCareer(data.career,sim)&&validateWellbeing(sim.wellbeing,sim)&&
+    validateLife(data.life,sim,home)&&validateDialogue(data.dialogue,sim)&&
+    validateCalendar(data.calendar,sim)&&validateFinance(data.finance,sim)&&validateSocial(data.social,sim)&&validateEmotions(data.emotions,sim)&&
+    !(data.life?.sleep&&atWork(data))&&!(data.life?.shopping&&atWork(data))&&
+    !(data.social?.visit&&(atWork(data)||data.life?.shopping))&&
+    !(data.life?.retired&&data.career?.jobId);
 }
 
 export function migrateGame(data) {
   const next={
     ...data,
     onboarding: data.onboarding ?? true,
+    career:{...newCareer(),...data.career},
+    life:data.life??newLife(data.sim.day),
+    dialogue:data.dialogue??newDialogue(),
+    calendar:data.calendar??newCalendar(),finance:data.finance??newFinance(data.sim.day,jobFor(data.career?.jobId)?.salary||450),
+    social:data.social??newSocial(data.sim.day),emotions:data.emotions??newEmotions(),
     home: { ...data.home, foundation: data.home.foundation ?? true, rooms: data.home.rooms || [],
       removedExterior: data.home.removedExterior || [], exteriorEdits: data.home.exteriorEdits || {} },
-    sim: { ...data.sim, autonomy: data.sim.autonomy ?? true, catches:data.sim.catches || [], needs: { ...NEED_DEFAULTS, ...data.sim.needs } },
+    sim: { ...data.sim, autonomy: data.sim.autonomy ?? true, catches:data.sim.catches || [],wellbeing:data.sim.wellbeing??newWellbeing(), needs: { ...NEED_DEFAULTS, ...data.sim.needs } },
   };
+  if(!data.career?.attendance)next.career.attendance=newAttendance(data.sim.day);
+  if(!data.career?.workplace&&atWork(next)&&next.career.phase!=='leaving'){
+    next.career=beginProject(next.career,jobFor(next.career.jobId),next.sim);
+    const p=next.career.workplace.project,worked=next.career.shift.worked;
+    p.done=Math.min(p.required,worked);p.focused=worked;p.spent=worked;
+    p.events=[45,155,280].filter(at=>worked>=at).length;
+  }
   return isApartment(next.home)?apartmentWalkable(next.sim.x,next.sim.z)?next:
     {...next,sim:{...next.sim,x:0,z:0}}:restoreWorldPosition(next);
 }

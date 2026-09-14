@@ -24,11 +24,21 @@ export function createComputerScreen() {
   const geometry=new THREE.PlaneGeometry(.86,.53);
   const mesh=new THREE.Mesh(geometry,material);
   mesh.name='ComputerScreen';mesh.position.set(0,1.31,-.437);
-  let playing=false,time=0,frame=0,lastStep=-1;
+  let playing=false,time=0,frame=0,lastStep=-1,mode='chat',title='';
   const messages=['今天过得怎么样？','刚收拾好家，想歇一会儿。','我也是，晚上一起看电影吧。','好呀，给我推荐一部！'];
   function draw() {
     ctx.fillStyle=playing?'#edf4f2':'#253d43';ctx.fillRect(0,0,512,320);
-    if(playing) {
+    if(playing&&mode!=='chat'){
+      ctx.fillStyle='#405962';ctx.fillRect(0,0,512,48);
+      ctx.fillStyle='#f7faf9';ctx.font='20px sans-serif';ctx.fillText(mode==='jobs'?'青禾招聘':title||'今日工作',20,31);
+      const rows=mode==='jobs'?['文档助理          320 / 天','视觉设计师        480 / 天','软件测试员        600 / 天']:
+        ['任务列表','待处理文档','修改记录','核对与提交'];
+      for(let i=0;i<rows.length;i++){
+        ctx.fillStyle='#ffffff';ctx.fillRect(18,62+i*51,476,42);
+        ctx.fillStyle='#415861';ctx.font='18px sans-serif';ctx.fillText(rows[i],30,89+i*51);
+      }
+      ctx.fillStyle='#91b4aa';ctx.fillRect(22,287,80+(Math.floor(time)%8)*42,5);
+    }else if(playing) {
       ctx.fillStyle='#365951';ctx.fillRect(0,0,512,50);
       ctx.fillStyle='#f6f6ee';ctx.font='20px sans-serif';ctx.fillText('好友 · 江宁',22,33);
       ctx.fillStyle='#86c49d';ctx.beginPath();ctx.arc(475,25,6,0,Math.PI*2);ctx.fill();
@@ -49,6 +59,7 @@ export function createComputerScreen() {
   draw();
   return {
     mesh,
+    setMode(value,heading=''){mode=['chat','jobs','office'].includes(value)?value:'chat';title=heading;draw();},
     setPlaying(value) { if(playing===value)return;playing=value;time=0;lastStep=-1;draw(); },
     update(delta) {
       if(!playing||delta<=0)return;
@@ -60,7 +71,7 @@ export function createComputerScreen() {
       const data=ctx.getImageData(0,0,512,320).data;
       let checksum=0;
       for(let i=0;i<data.length;i+=64)checksum=(checksum*31+data[i]+data[i+1])>>>0;
-      return {playing,time,frame,checksum};
+      return {playing,time,frame,checksum,mode};
     },
     dispose(){geometry.dispose();material.dispose();texture.dispose();},
   };

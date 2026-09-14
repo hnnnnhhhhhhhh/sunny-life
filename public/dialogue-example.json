@@ -1,0 +1,49 @@
+{
+  "id": "weekend_garden",
+  "title": "The Community Garden",
+  "start": "invitation",
+  "nodes": [
+    {
+      "id": "invitation",
+      "speaker": "Neighbor",
+      "text": "We are planting herbs this weekend. Would you like to join?",
+      "choices": [
+        {
+          "id": "join",
+          "label": "I would love to help.",
+          "next": "together",
+          "effects": { "social": 6, "trust": 4 },
+          "flag": "garden_friend"
+        },
+        {
+          "id": "rest",
+          "label": "I need a quiet weekend.",
+          "next": "rest",
+          "effects": { "stress": -5 }
+        }
+      ]
+    },
+    {
+      "id": "together",
+      "speaker": "Neighbor",
+      "text": "Great. I will bring the seedlings.",
+      "choices": [
+        { "id": "thanks", "label": "See you there.", "next": "end", "effects": { "fun": 4 } }
+      ]
+    },
+    {
+      "id": "rest",
+      "speaker": "Neighbor",
+      "text": "Of course. We can catch up another day.",
+      "choices": [
+        { "id": "thanks", "label": "Thank you for understanding.", "next": "end" }
+      ]
+    },
+    {
+      "id": "end",
+      "speaker": "Neighbor",
+      "text": "Take care!",
+      "choices": []
+    }
+  ]
+}

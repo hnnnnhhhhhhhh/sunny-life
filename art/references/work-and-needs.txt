@@ -1,0 +1,63 @@
+WORK AND NEEDS
+
+Playable flow
+- Home computer -> Find work -> choose one of three office jobs.
+- Commute is queued behind a current manual activity and walks through the
+  home doorway before changing scene.
+- The supplied Isometric office model is used, with one desk replaced by an
+  interactive cubicle. A public cafe and restroom are added alongside it.
+- Office paths use PathFinding.js and a grid rasterized from the real model.
+- Work, break, paid refreshments, restroom, early departure and end-of-shift
+  settlement are persistent states. No external clock or background replay
+  advances the simulation while the page is closed.
+
+Economy
+- Salary is prorated by actual working minutes, rounded once at settlement.
+- Commute, rest, coffee, lunch and restroom time are unpaid.
+- One settlement per game day; switching jobs cannot collect twice.
+- Coffee costs 18, lunch costs 28. Coffee is limited to two a day and a
+  90-game-minute interval. Lunch is limited to one purchase a day.
+- Benefits accrue during the break, not at purchase.
+- Two hours of continuous work increases fun/energy drain and stress.
+- A break resets the continuous-work streak. Severe hunger/exhaustion
+  automatically ends the shift.
+- Build undo/redo applies only the edit's budget delta, preserving wages
+  and other non-build transactions.
+- Existing apartment/coastal residence budget separation remains unchanged.
+
+Needs
+- Healthy: above 50, green #57966a.
+- Low: above 20 through 50, orange #c78c35.
+- Urgent: 0 through 20, red #cb5c52.
+- The same colors drive all six bars, mood status and the overhead marker.
+- At bladder zero outside an active toilet action: one accident, hygiene=0,
+  bladder=65, fun=-18, embarrassed mood for 90 game minutes.
+- Accident count, time and mood duration are saved. Reload does not repeat it.
+- Normal social deprivation reduces fun progressively. The Social trait
+  amplifies that effect and increases social decay.
+- Very low hygiene/hunger lowers fun; severe hunger also drains energy.
+- Existing base need-decay rates are unchanged.
+- These are fictional game mechanics, not medical or psychological guidance.
+
+Implementation
+- career.js: persistent career transitions, settlement and validation.
+- needs.js: coupled needs, accident handling and semantic severity.
+- office-layout.js: grid routing and interaction anchors.
+- office.js: real-time visual motion, keyboard IK and cafe props.
+- office-assets.js: lazy model loading, retry after failure.
+- CareerPanel.jsx: job listings and compact career controls.
+
+Office assets
+- Original: Companion_Cube, CC BY 4.0.
+- Attribution: public/models/office/LICENSE.txt.
+- Original GLB stays at the user-supplied external path, unchanged.
+- Derived GLB uses resized WebP textures, merged static primitives and gzip.
+- Rebuild:
+  node scripts/office-assets.mjs --source=/absolute/path/to/isometric_office.glb
+
+Validation
+- tests/career-needs.test.js
+- tests/browser/career-needs.spec.js
+- Existing computer/daylight, neighborhood, daily-life and needs regressions.
+- Software WebGL plus desktop/mobile canvas and screenshot checks.
+- The separate Mrs_Afton local preview is still not included in public builds.

@@ -19,6 +19,8 @@ test('computer conversation sits, types, animates its screen, pauses and cancels
   await page.getByRole('button',{name:'网上聊天',exact:true}).click();
   await page.getByRole('button',{name:'3倍速',exact:true}).click();
   await expect.poll(()=>diag(page).then(d=>d.activity?.stage),{timeout:30000,intervals:[100]}).toBe('active');
+  await expect(page.getByRole('dialog',{name:'邻里日常'})).toBeVisible();
+  await page.getByRole('dialog',{name:'邻里日常'}).getByRole('button',{name:'关闭',exact:true}).click();
   await page.getByRole('button',{name:'暂停生活',exact:true}).click();
   const start=await diag(page);
   expect(start.activity.type).toBe('onlineChat');
@@ -77,7 +79,7 @@ test('time advancement drives sunset and freezes with pause',async({page})=>{
   await page.clock.install();
   await boot(page,game);
   await page.getByRole('button',{name:'3倍速',exact:true}).click();
-  await page.clock.fastForward(1500);
+  await page.clock.runFor(1500);
   expect((await diag(page)).lighting.phase).toBe('night');
   await page.getByRole('button',{name:'暂停生活',exact:true}).click();
   const paused=(await diag(page)).lighting;
@@ -93,6 +95,8 @@ test('computer completion advances the queue and mode changes turn the screen of
   await expect(page.getByRole('region',{name:'任务队列'})).toBeVisible();
   await page.getByRole('button',{name:'3倍速',exact:true}).click();
   await expect.poll(()=>diag(page).then(d=>d.activity?.stage),{timeout:30000}).toBe('active');
+  await expect(page.getByRole('dialog',{name:'邻里日常'})).toBeVisible();
+  await page.getByRole('dialog',{name:'邻里日常'}).getByRole('button',{name:'关闭',exact:true}).click();
   await expect.poll(()=>diag(page).then(d=>d.queue.length),{timeout:30000}).toBe(0);
   await expect.poll(()=>diag(page).then(d=>d.computers[0].playing),{timeout:15000}).toBe(true);
   await page.getByRole('button',{name:'建造',exact:true}).click();

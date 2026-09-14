@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ACTIVITIES, ITEM_MAP, activityTypes, surfaceHeight } from './game.js';
-import { MEALS, planActivity, planChat, localPoint, STAGE_LABELS } from './interactions.js';
+import { MEALS, planActivity, planChat, planHandwash, localPoint, STAGE_LABELS } from './interactions.js';
 import { createMeal } from './meal-props.js';
 import { createSleepCover } from './activity-props.js';
 import { createBathroomEffects } from './bathroom-effects.js';
@@ -9,6 +9,11 @@ import { BED_TIMING, bedPoseAt } from './bed-motion.js';
 import { createHandwashEffects, handwashTargets, handwashPhase, HANDWASH_DURATION } from './handwashing.js';
 import { typingTargets } from './computer.js';
 import { isApartment } from './residence.js';
+import {SLEEP_MINUTES,LAUNDRY_MINUTES,laundryError} from './life.js';
+import {dryingPoint} from './household-props.js';
+import {TV_CHANNELS} from './entertainment.js';
+import {serviceError} from './finance.js';
+import {socialActionError,SOCIAL_ACTIONS,friendById} from './social.js';
 
 const ease = value => THREE.MathUtils.smoothstep(value, 0, 1);
 
@@ -26,14 +31,23 @@ export class ActivityRunner {
     const object = home.furniture.find(item => item.id === id);
     const type = options.activity || (object && ITEM_MAP[object.type].activity);
     if (!object || !activityTypes(object.type).includes(type)) return false;
-    if(['sleep','washHands','onlineChat'].includes(type)&&!world.player.userData.controller) {
+    const unavailable=serviceError(world.state.game,type,recipe);
+    if(unavailable){if(!options.autonomous)world.emit({type:'toast',message:unavailable});return false;}
+    if(['sleep','washHands','onlineChat','jobSearch'].includes(type)&&!world.player.userData.controller) {
       if(!options.autonomous)world.emit({type:'toast',message:'人物动作资源未加载成功，请刷新后重试'});
       return false;
     }
     const from = { x: world.player.position.x, z: world.player.position.z };
     const plan = options.plan || planActivity(home, object, from, world.navGrid, world.state.game.avatar.height,type);
     if (plan.error) { if (!options.autonomous) world.emit({ type: 'toast', message: plan.error }); return false; }
+    if(type==='eat'){
+      recipe=MEALS[recipe]?recipe:'pancakes';
+      if(world.state.game.budget<MEALS[recipe].price){world.emit({type:'toast',message:'余额不足，可选择免费家常吐司'});return false;}
+      world.emit({type:'buyMeal',recipe});
+    }
     this.current = { ...plan, type, autonomous: !!options.autonomous, fixture: { ...object }, recipe: MEALS[recipe] ? recipe : 'pancakes', stage: 'approach', elapsed: 0, progress: 0, duration: { rest: 14, watch: 16, sleep: 18, shower: 14, toilet: 9, onlineChat:16, washHands:HANDWASH_DURATION }[type] || 6.25 };
+    this.current.channel=TV_CHANNELS[options.channel]?options.channel:'nature';
+    this.current.restoring=!!options.restoring;
     world.path = plan.path.slice();
     world.arrivalActivity = null;
     const end = plan.path.at(-1);
@@ -42,6 +56,25 @@ export class ActivityRunner {
     world.emit({ type: 'walking' });
     this.emit();
     return true;
+  }
+
+  startLaundry(task, options = {}) {
+    const {world}=this,game=world.state.game,error=laundryError(game,task);
+    if(error){if(!options.autonomous)world.emit({type:'toast',message:error});return false;}
+    const unavailable=serviceError(game,task==='wash'?'laundryWash':'laundryHang');
+    if(unavailable){if(!options.autonomous)world.emit({type:'toast',message:unavailable});return false;}
+    const sink=game.home.furniture.find(f=>f.type==='sink')||game.home.furniture.find(f=>f.type==='kitchen');
+    if(task==='wash'&&!sink){world.emit({type:'toast',message:'先放置洗手台或厨房水槽'});return false;}
+    const point=dryingPoint(game.home);
+    const plan=task==='wash'?planHandwash(game.home,sink,world.player.position,world.navGrid)
+      :planChat(game.home,point,world.player.position,world.navGrid);
+    if(plan.error){if(!options.autonomous)world.emit({type:'toast',message:plan.error});return false;}
+    this.cancel(true);
+    this.current={...plan,type:task==='wash'?'laundryWash':'laundryHang',task,fixture:sink,
+      rack:point,floor:surfaceHeight(game.home,plan.approach.x,plan.approach.z),
+      stage:'approach',elapsed:0,progress:0,autonomous:!!options.autonomous};
+    world.path=plan.path.slice();world.destination.visible=false;
+    world.emit({type:'walking'});this.emit();return true;
   }
 
   startChat(id, options = {}) {
@@ -64,6 +97,18 @@ export class ActivityRunner {
     world.emit({ type: 'walking' });
     this.emit();
     return true;
+  }
+
+  startGuest(id,verb){
+    const {world}=this,game=world.state.game,guest=world.guests?.person(id);
+    const error=socialActionError(game,id,verb);
+    if(!guest||error){world.emit({type:'toast',message:error||'朋友还没有到家'});return false;}
+    const plan=planChat(game.home,guest.mesh.position,world.player.position,world.navGrid);
+    if(plan.error){world.emit({type:'toast',message:plan.error});return false;}
+    this.cancel(true);
+    this.current={...plan,type:'guest',guestId:id,verb,visitId:game.social.visit.id,
+      stage:'approach',elapsed:0,progress:0,duration:SOCIAL_ACTIONS[verb].duration};
+    world.path=plan.path.slice();world.destination.visible=false;world.emit({type:'walking'});this.emit();return true;
   }
 
   startFishing(id) {
@@ -90,6 +135,10 @@ export class ActivityRunner {
     this.current.startRotation = this.world.player.rotation.y;
     this.world.player.userData.controller?.play(this.current.seat ? 'SitDown' : 'Idle',this.current.type==='sleep'?0:0.15);
     this.world.emit({ type: 'arrived' });
+    if(this.current.guestId)this.world.emit({type:'social',value:{kind:'begin',id:this.current.guestId,verb:this.current.verb}});
+    if(this.current.task)this.world.emit({type:'life',value:{kind:'laundryStart',task:this.current.task}});
+    if(this.current.type==='chat'&&!this.current.autonomous)
+      this.world.emit({type:'conversation',contact:this.current.npcId,name:this.current.partnerName});
     if (['toilet', 'shower'].includes(this.current.type)) {
       this.bathroom = createBathroomEffects(this.current.type, this.current.fixture, this.current.floor);
       this.bathroom.group.visible = false;
@@ -111,7 +160,7 @@ export class ActivityRunner {
     } else if (this.current.type === 'watch') {
       const television = this.world.state.game.home.furniture.find(item => item.id === this.current.televisionId);
       this.world.command('television', { ...television, seat: this.current.seat, floor: this.current.floor });
-    } else if(this.current.type==='onlineChat') {
+    } else if(['onlineChat','jobSearch'].includes(this.current.type)) {
       this.world.command('computer',{...this.current.fixture,floor:this.current.floor});
     } else if (['sleep', 'shower','washHands'].includes(this.current.type) || this.current.seat) {
       const target = this.world.state.game.home.furniture.find(item => item.id === (this.current.seatId || this.current.targetId));
@@ -126,6 +175,7 @@ export class ActivityRunner {
     let label = action && (action.stage === 'approach' ? '正在前往' : ACTIVITIES[action.type].status);
     if (action?.type === 'eat') label = STAGE_LABELS[action.stage];
     else if (action?.type === 'chat') label = action.stage === 'approach' ? `走向${action.partnerName}` : `与${action.partnerName}聊天`;
+    else if(action?.type==='guest')label=action.stage==='approach'?`走向${friendById(action.guestId).name}`:SOCIAL_ACTIONS[action.verb].label;
     else if (action?.type === 'sleep') label = { approach:'走到床边','bed-sit':'坐到床沿','bed-legs':'抬腿上床',
       'bed-recline':'缓缓躺下',active:'熟睡中','bed-rise':'撑起上身','bed-lower':'双脚落地','bed-stand':'从床边起身' }[action.stage];
     else if (action?.type === 'shower') label = { approach: '前往淋浴间', entering: '进入淋浴间', active: '正在淋浴', standing: '擦干离开', cancelling: '离开淋浴间' }[action.stage];
@@ -177,6 +227,9 @@ export class ActivityRunner {
     const action = this.current;
     if (!action) return;
     const { world } = this;
+    if(action.guestId&&notifyPosition)world.emit({type:'social',value:completed?
+      {kind:'complete',id:action.guestId,verb:action.verb,visitId:action.visitId}:{kind:'cancel'}});
+    if(action.type==='sleep'&&notifyPosition)world.emit({type:'life',value:{kind:'sleepStop'}});
     if (notifyPosition) this.creditProgress(action);
     world.player.userData.controller?.showAccessory('fork', false);
     world.player.userData.controller?.showAccessory('bite', false);
@@ -216,19 +269,25 @@ export class ActivityRunner {
   }
 
   creditProgress(action = this.current) {
-    if (!action) return;
-    const total = action.type === 'eat' ? MEALS[action.recipe].amount : ACTIVITIES[action.type].amount;
+    if (!action || action.type==='sleep' || action.task || action.guestId) return;
+    const channel=TV_CHANNELS[action.channel]||TV_CHANNELS.nature;
+    const total = action.type === 'eat' ? MEALS[action.recipe].amount : action.type==='watch'?channel.fun:ACTIVITIES[action.type].amount;
     const earned = total * action.progress;
     const amount = earned - (action.credited || 0);
     if (amount > 0) {
       action.credited = earned;
-      this.world.emit({ type:'needGain', need:ACTIVITIES[action.type].need, amount });
+      this.world.emit({ type:'needGain', need:ACTIVITIES[action.type].need, amount,
+        stressRelief:action.type==='watch'?amount/total*channel.stress:0 });
     }
   }
 
   update(delta, walking) {
     const { world } = this, animator = world.player.userData.controller;
     const action = this.current;
+    if(action&&serviceError(world.state.game,action.type,action.recipe)&&!['cancelling','standing','approach'].includes(action.stage)){
+      world.emit({type:'toast',message:serviceError(world.state.game,action.type,action.recipe)});
+      this.cancel(false);return;
+    }
     if (action?.npcId) {
       const npc = world.npcs.find(person => person.id === action.npcId);
       if (!npc) { this.cancel(true); return; }
@@ -237,13 +296,41 @@ export class ActivityRunner {
     if (!action || action.stage === 'approach') {
       animator?.play(walking ? 'Walk' : 'Idle');
       animator?.update(delta);
+      if(!action&&!walking){
+        animator?.idlePose();
+        const needs=world.state.game.sim.needs;
+        if(world.state.game.sim.wellbeing?.embarrassed>0||Math.min(needs.bladder,needs.energy,needs.social,needs.hygiene)<=20)
+          animator?.discomfortPose();
+      }
       return;
     }
     if (action.targetId && !world.state.game.home.furniture.some(item => item.id === action.targetId)) {
       this.cancel(true); return;
     }
     action.elapsed += delta;
-    if (action.type === 'sleep') {
+    if(action.guestId){
+      const guest=world.guests?.person(action.guestId),visit=world.state.game.social.visit,interaction=world.state.game.social.interaction;
+      if(!guest||visit?.id!==action.visitId||visit.stage!=='active'){this.finish(false);return;}
+      world.player.rotation.y=Math.atan2(guest.mesh.position.x-world.player.position.x,guest.mesh.position.z-world.player.position.z);
+      animator?.play(Math.floor(action.elapsed/2)%2?'Listen':'Talk');animator?.update(delta);
+      action.progress=Math.min(1,(interaction?.elapsed||0)/action.duration);
+      if(action.progress===1){this.finish(true);return;}
+    }else if(action.task){
+      const laundry=world.state.game.life.laundry;
+      world.player.rotation.y=action.rotation;
+      animator?.play('Idle');animator?.update(delta);
+      if(action.task==='wash'){
+        const time=action.elapsed%HANDWASH_DURATION;
+        animator?.handwashPose(handwashTargets(time,action.fixture,action.floor),time,1);
+      }else{
+        animator?.reach(new THREE.Vector3(action.rack.x+Math.sin(action.elapsed)*.3,action.floor+1.2,action.rack.z));
+      }
+      const expected=action.task==='wash'?'washing':'hanging';
+      if(laundry.stage===expected)action.progress=laundry.elapsed/LAUNDRY_MINUTES[action.task];
+      else if((action.task==='wash'?['wet','drying','clean']:['drying','clean']).includes(laundry.stage)){
+        action.progress=1;this.finish(true);return;
+      }
+    } else if (action.type === 'sleep') {
       this.updateSleep(delta);
     } else if (action.type === 'shower') {
       this.updateShower(delta);
@@ -284,7 +371,7 @@ export class ActivityRunner {
       world.player.rotation.y = action.rotation;
       animator?.play(entering ? 'SitDown' : exiting ? 'StandUp' : action.type === 'eat' ? 'Eat' : 'SitIdle', 0.12);
       animator?.update(delta, seated, action.seatTop);
-      if(action.type==='onlineChat') {
+      if(['onlineChat','jobSearch'].includes(action.type)) {
         if(action.stage==='active')action.chatTime=action.elapsed;
         const weight=entering?ease((action.elapsed-.8)/.55):exiting?(1-ease(action.elapsed/.4)):1;
         animator?.typingPose(typingTargets(action.fixture,action.floor,action.chatTime||0),action.chatTime||0,weight);
@@ -306,10 +393,18 @@ export class ActivityRunner {
           this.meal.group.rotation.y = action.rotation;
           world.worldRoot.add(this.meal.group);
         }
-        if (action.televisionId) world.items.get(action.televisionId)?.mesh.userData.screenPlayback?.setPlaying(true);
-        if (action.type==='onlineChat') world.items.get(action.computerId)?.mesh.userData.computerPlayback?.setPlaying(true);
+        if (action.televisionId) {
+          const screen=world.items.get(action.televisionId)?.mesh.userData.screenPlayback;
+          screen?.setChannel(action.channel);screen?.setPlaying(true);
+        }
+        if (['onlineChat','jobSearch'].includes(action.type)){
+          const screen=world.items.get(action.computerId)?.mesh.userData.computerPlayback;
+          screen?.setMode(action.type==='jobSearch'?'jobs':'chat');screen?.setPlaying(true);
+          if(action.type==='jobSearch')world.emit({type:'jobSearchReady'});
+          if(action.type==='onlineChat'&&!action.autonomous)world.emit({type:'conversation',contact:'online-friend',name:'好友知夏'});
+        }
       } else if (action.stage === 'active') {
-        action.progress = Math.min(1, action.elapsed / (action.type === 'eat' ? MEALS[action.recipe].duration : action.duration));
+        action.progress = action.type==='jobSearch'?0:Math.min(1, action.elapsed / (action.type === 'eat' ? MEALS[action.recipe].duration : action.duration));
         this.meal?.update(action.progress);
         const phase = action.elapsed % 3.04 / 3.04;
         const bite = phase < 0.55 ? THREE.MathUtils.smoothstep(phase, 0.12, 0.43)
@@ -362,10 +457,11 @@ export class ActivityRunner {
       action.stage=pose.stage;
       if(action.bedTime===0)this.finish(!!action.completed);
     } else if(sleeping) {
-      action.progress = Math.min(1, action.elapsed / action.duration);
+      action.progress = Math.min(1, (world.state.game.life.sleep?.elapsed||0) / SLEEP_MINUTES);
       if(action.progress===1){action.bedExiting=true;action.completed=true;action.stage='bed-rise';}
     } else if(action.bedTime===BED_TIMING.total) {
       action.stage='active';action.elapsed=0;
+      world.emit({type:'life',value:{kind:'sleepStart',bedId:action.targetId}});
     } else action.stage=pose.stage;
   }
 

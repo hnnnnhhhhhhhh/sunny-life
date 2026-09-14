@@ -59,6 +59,8 @@ test('chat holds the neighbour in place, turns both residents, and releases on c
   expect(held.busy).toBe(true);
   await page.getByRole('button', { name: '3倍速', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__sunny.diagnostics().activity?.stage), { timeout: 20000 }).toBe('active');
+  await expect(page.getByRole('dialog',{name:'邻里日常'})).toBeVisible();
+  await page.getByRole('dialog',{name:'邻里日常'}).getByRole('button',{name:'关闭',exact:true}).click();
   await page.waitForTimeout(700);
   const active = await page.evaluate(() => window.__sunny.diagnostics());
   expect(active.neighbors[0].position).toEqual(held.position);
@@ -101,6 +103,7 @@ test('sleep lies within the bed with head on the pillow and a blanket, then gets
   const progress = state.activity.progress;
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => window.__sunny.diagnostics().activity.progress)).toBeCloseTo(progress, 1);
+  await page.getByRole('button', { name: '取消当前活动', exact: true }).click();
   await page.getByRole('button', { name: '3倍速', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__sunny.diagnostics().activity), { timeout: 15000 }).toBeNull();
   expect(await page.evaluate(() => window.__sunny.diagnostics().coverVisible)).toBe(false);
@@ -111,7 +114,7 @@ test('watching TV uses a facing seat and really changes the display pixels', asy
   await boot(page);
   const before = await page.evaluate(() => window.__sunny.diagnostics().televisions[0]);
   expect(before.playing).toBe(false);
-  await useFurniture(page, 'tv-1', '看一会儿电影', 1.5);
+  await useFurniture(page, 'tv-1', '自然纪录片', 1.5);
   const a = await page.evaluate(() => window.__sunny.diagnostics());
   expect(a.activity.seatId).toBe('sofa-1');
   expect(a.televisions[0].playing).toBe(true);

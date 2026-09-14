@@ -35,6 +35,25 @@ export function createMeal(recipe = 'pancakes') {
       const angle = i * 0.55;
       add(food, new THREE.IcosahedronGeometry(0.027, 1), berry, Math.cos(angle) * 0.188, 0.055, Math.sin(angle) * 0.188);
     }
+  } else if (recipe === 'noodles') {
+    for (let i = 0; i < 20; i++) {
+      const strand = add(food, new THREE.TorusGeometry(.08 + (i % 4) * .02, .006, 5, 22, Math.PI * 1.8),
+        butter, Math.sin(i * 2.4) * .035, .04 + i * .003, Math.cos(i * 2.4) * .035);
+      strand.rotation.set(Math.PI / 2 + .15 * Math.sin(i), i, i * .4);
+    }
+    for (let i = 0; i < 5; i++) add(food, new THREE.BoxGeometry(.04,.008,.02), leaves, Math.sin(i)*.1,.12,Math.cos(i)*.09);
+  } else if (recipe === 'steak') {
+    const meat=mat('#875545'),char=mat('#4e3731');
+    const cut=add(food,new THREE.SphereGeometry(1,24,12),meat,-.025,.065,0);
+    cut.scale.set(.14,.04,.105);
+    for(let i=0;i<5;i++){
+      const line=add(food,new THREE.BoxGeometry(.008,.004,.13),char,-.1+i*.038,.103,0);
+      line.rotation.y=.35;
+    }
+    for(let i=0;i<3;i++)add(food,new THREE.IcosahedronGeometry(.035,1),leaves,.145,.064,(i-1)*.07);
+  } else if (recipe === 'toast') {
+    add(food,new THREE.BoxGeometry(.24,.045,.19),cake,0,.05,0);
+    add(food,new THREE.BoxGeometry(.21,.006,.16),butter,0,.076,0);
   } else {
     for (let i = 0; i < 11; i++) {
       const angle = i * 2.4, radius = 0.03 + (i % 3) * 0.045;

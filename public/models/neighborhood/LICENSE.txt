@@ -1,0 +1,33 @@
+SUNNY LIFE - NEIGHBORHOOD MODEL CREDITS
+
+GlamVelvetSofa
+Copyright 2021 Wayfair, LLC. Author: Eric Chadwick.
+Creative Commons Attribution 4.0 International (CC BY 4.0).
+https://creativecommons.org/licenses/by/4.0/
+https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/GlamVelvetSofa
+Changes: fitted width, depth and seat height to the existing game; adjusted
+fabric color and sheen, retained authored AO/normal detail; resized textures.
+
+Curtains Double
+Author: Quaternius. Creative Commons Zero 1.0 (CC0).
+https://creativecommons.org/publicdomain/zero/1.0/
+https://poly.pizza/m/kkeII96j9N
+Changes: split fabric from rail, subdivided and smoothed folds, opened panels,
+normalized dimensions, added fabric material and a gentle breeze morph.
+
+Car Kit: sedan, taxi, van
+Author: Kenney. Creative Commons Zero 1.0 (CC0).
+https://creativecommons.org/publicdomain/zero/1.0/
+https://kenney.nl/assets/car-kit
+Changes: scaled to the neighborhood, centered the origin, retained palette
+texture, recentered wheel pivots. Runtime headlights and traffic are original.
+
+This bundle includes the above licensed works and Sunny Life adaptations.
+The sofa and its adaptations are provided under CC BY 4.0. Original CC0
+assets remain CC0. Original authors do not endorse this game.
+Source files and adaptation pipeline: art/vendor/neighborhood,
+art/blender/build_neighborhood.py, scripts/neighborhood-assets.mjs.
+
+Background music
+Original generative keyboard composition implemented in src/music.js.
+No third-party recordings or compositions are used.

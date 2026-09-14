@@ -7,12 +7,12 @@ import {
   Palette, Pause, Play, Plus, Redo2, RotateCw, Save, Scissors,
   Search, Settings2, Shirt, Shuffle, Smile, Sofa, Sparkles, Sprout, Sun,
   Trash2, Undo2, Utensils, UtensilsCrossed, X, Zap, ZoomIn, ZoomOut,
-  Bath, Camera, ChevronUp, DoorOpen, Scan, Square, RotateCcw, Toilet, ShowerHead, Box as BoxIcon, Fish, FishSymbol, Gauge, Droplets, Building2, ArrowLeftRight,
+  Bath, Camera, CarFront, Coffee,BriefcaseBusiness,LogOut,ChevronUp, DoorOpen, Scan, Square, RotateCcw, Toilet, ShowerHead, Box as BoxIcon, Fish, FishSymbol, Gauge, Droplets, Building2, ArrowLeftRight,
 } from 'lucide-react';
 import {
   ACTIVITIES, CATALOG, CLOTHES_COLORS, FLOOR_STYLES, HAIR_COLORS,
   ITEM_MAP, activityTypes, SKIN_COLORS, TRAITS, WALL_COLORS, loadGame, newGame, saveGame, uid,
-  validatePlacement, validateResize, validateSave, validateWall, createRoom, bathroomAddition, migrateGame, advanceSim, GAME_MINUTES_PER_SECOND, newApartmentGame, switchResidence,
+  validatePlacement, validateResize, validateSave, validateWall, createRoom, bathroomAddition, migrateGame, advanceGame, GAME_MINUTES_PER_SECOND, newApartmentGame, switchResidence,upgradeHousing,
 } from './game.js';
 import { allWalls, floorRegions, removeWall, setWallOpening, wallParts } from './architecture.js';
 import { avatarModel, furnitureModel, modelPreview } from './models.js';
@@ -22,6 +22,20 @@ import { MEALS } from './interactions.js';
 import { ResidentPanel, TimeControls } from './Hud.jsx';
 import { FISH, FISHING_SPOTS } from './fishing.js';
 import { isApartment } from './residence.js';
+import {MusicControl} from './MusicControl.jsx';
+import {JobListings} from './CareerPanel.jsx';
+import {atWork,careerAction,departureError,refreshmentError,jobFor} from './career.js';
+import {loadOfficeAssets} from './office-assets.js';
+import {lifeAction,awayShopping,shoppingError} from './life.js';
+import {dialogueAction,activeDialogue} from './dialogue.js';
+import {DialoguePanel,TelevisionMenu} from './LifePanel.jsx';
+import {WorkplacePanel,WorkEventBody,WorkNotice} from './WorkplacePanel.jsx';
+import {WORK_EVENTS} from './workplace-stories.js';
+import {CalendarPanel,BillsPanel,SocialPanel,MoodPanel,ConflictPanel,AttendancePanel} from './DailyPanels.jsx';
+import {calendarAction} from './calendar.js';
+import {financeAction,utilities} from './finance.js';
+import {socialAction} from './social.js';
+import {reflectionAction} from './emotions.js';
 
 const formatMoney = n => new Intl.NumberFormat('en-US').format(n);
 
@@ -56,25 +70,45 @@ function reducer(state, action) {
   if (action.type === 'edit') {
     const next = action.update(state.game);
     if (next === state.game) return state;
-    return { ...state, game: next, past: [...state.past.slice(-39), { home: state.game.home, budget: state.game.budget }], future: [] };
+    return { ...state, game: {...next,life:{...next.life,sleep:null}}, past: [...state.past.slice(-39), { home: state.game.home, budgetDelta: state.game.budget-next.budget }], future: [] };
   }
   if (action.type === 'undo' && state.past.length) {
     const previous = state.past[state.past.length - 1];
-    return { ...state, game: { ...state.game, ...previous }, past: state.past.slice(0, -1), future: [{ home: state.game.home, budget: state.game.budget }, ...state.future] };
+    const delta=previous.budgetDelta??previous.budget-state.game.budget,budget=state.game.budget+delta;
+    if(budget<0||budget>1000000)return state;
+    return { ...state, game: { ...state.game,home:previous.home,budget,life:{...state.game.life,sleep:null} }, past: state.past.slice(0, -1), future: [{ home: state.game.home, budgetDelta:-delta }, ...state.future] };
   }
   if (action.type === 'redo' && state.future.length) {
-    return { ...state, game: { ...state.game, ...state.future[0] }, past: [...state.past, { home: state.game.home, budget: state.game.budget }], future: state.future.slice(1) };
+    const next=state.future[0],delta=next.budgetDelta??next.budget-state.game.budget,budget=state.game.budget+delta;
+    if(budget<0||budget>1000000)return state;
+    return { ...state, game: { ...state.game,home:next.home,budget,life:{...state.game.life,sleep:null} }, past: [...state.past, { home: state.game.home, budgetDelta:-delta }], future: state.future.slice(1) };
   }
   if (action.type === 'sim') return { ...state, game: { ...state.game, sim: { ...state.game.sim, ...action.value } } };
   if (action.type === 'needGain') {
     const sim=state.game.sim;
-    return { ...state,game:{...state.game,sim:{...sim,needs:{...sim.needs,[action.need]:Math.min(100,sim.needs[action.need]+action.amount)}}} };
+    return { ...state,game:{...state.game,career:{...state.game.career,stress:Math.max(0,state.game.career.stress-(action.stressRelief||0))},
+      sim:{...sim,needs:{...sim.needs,[action.need]:Math.min(100,sim.needs[action.need]+action.amount)}}} };
   }
   if (action.type === 'fishCaught') return { ...state,game:{...state.game,sim:{...state.game.sim,
     catches:[...state.game.sim.catches.slice(-199),{type:action.fish.id,day:state.game.sim.day}]}} };
   if (action.type === 'tick') {
-    return { ...state, game: { ...state.game, sim: advanceSim(state.game.sim, GAME_MINUTES_PER_SECOND * action.speed) } };
+    return { ...state, game: advanceGame(state.game, GAME_MINUTES_PER_SECOND * action.speed * .25,action.context) };
   }
+  if(action.type==='life')return {...state,game:lifeAction(state.game,action.value)};
+  if(action.type==='calendar')return {...state,game:calendarAction(state.game,action.value)};
+  if(action.type==='finance')return {...state,game:financeAction(state.game,action.value)};
+  if(action.type==='social')return {...state,game:socialAction(state.game,action.value)};
+  if(action.type==='reflection')return {...state,game:reflectionAction(state.game,action.value)};
+  if(action.type==='dialogue')return {...state,game:dialogueAction(state.game,action.value)};
+  if(action.type==='upgradeHousing'){
+    const game=upgradeHousing(state.game);
+    return game===state.game?state:{...state,game,past:[],future:[],loadVersion:state.loadVersion+1};
+  }
+  if(action.type==='buyMeal'){
+    const price=MEALS[action.recipe]?.price;
+    return price===undefined||state.game.budget<price?state:{...state,game:{...state.game,budget:state.game.budget-price}};
+  }
+  if(action.type==='career')return {...state,game:careerAction(state.game,action.value)};
   if (action.type === 'avatar') return { ...state, game: { ...state.game, onboarding:true, avatar: action.value } };
   if (action.type === 'load') return { game: action.value, past: [], future: [], loadVersion: state.loadVersion + 1 };
   return state;
@@ -122,7 +156,7 @@ function Modal({ title, onClose, children, wide = false }) {
     el.showModal();
     return () => { if (el.open) el.close(); };
   }, []);
-  return <dialog className={`modal ${wide ? 'wide' : ''}`} ref={dialog} onCancel={onClose} onClick={e => { if (e.target === dialog.current) onClose(); }}>
+  return <dialog className={`modal ${wide ? 'wide' : ''}`} aria-label={title} ref={dialog} onCancel={onClose} onClick={e => { if (e.target === dialog.current) onClose(); }}>
     <div className="modal-heading"><h2>{title}</h2><IconButton icon={X} label="关闭" onClick={onClose} /></div>
     {children}
   </dialog>;
@@ -136,6 +170,11 @@ export default function App({ modelWarning = false }) {
   });
   const { game } = state;
   const apartment=isApartment(game.home);
+  const office=atWork(game);
+  const [careerFocus,setCareerFocus]=useState(0);
+  const lastPay=useRef(game.career?.lastPay);
+  const careerLoad=useRef(state.loadVersion);
+  const accidentCount=useRef(game.sim.wellbeing?.accidents||0);
   const [apartmentExterior,setApartmentExterior]=useState(false);
   const [mode, setMode] = useState(game.onboarding ? 'live' : 'avatar');
   const onboarding = game.onboarding === false;
@@ -155,6 +194,8 @@ export default function App({ modelWarning = false }) {
   const [avatarTab, setAvatarTab] = useState('face');
   const [draft, setDraft] = useState(onboarding ? {...game.avatar,name:''} : game.avatar);
   const [modal, setModal] = useState(null);
+  const [workPerson,setWorkPerson]=useState(null);
+  const [socialPerson,setSocialPerson]=useState(null);
   const [saved, setSaved] = useState('saved');
   const [toast, setToast] = useState('');
   const [ready, setReady] = useState(false);
@@ -169,7 +210,8 @@ export default function App({ modelWarning = false }) {
   const [mobilePanel, setMobilePanel] = useState(false);
   const worldNode = useRef(null), world = useRef(null), eventHandler = useRef(null);
   const latest = useRef(null), toastTimer = useRef(null), catalogue = useRef(null), fileInput = useRef(null);
-  latest.current = { ...state, mode, tool, selected, pending, roof, cutaway, lowQuality, showGrid, speed, draft, wallStart, activity, apartmentExterior, propertiesOpen: mobilePanel, catalogOpen };
+  const effectiveSpeed=game.dialogue.active||['work','work-event','calendar','finance','social','mood','conflict','attendance'].includes(modal)?0:speed;
+  latest.current = { ...state, mode, tool, selected, pending, roof, cutaway, lowQuality, showGrid, speed:effectiveSpeed, draft, wallStart, activity, apartmentExterior, propertiesOpen: mobilePanel, catalogOpen };
   const selectedObject = game.home.furniture.find(f => f.id === selected);
   const selectedInfo = selectedObject && ITEM_MAP[selectedObject.type];
   const filtered = useMemo(() => CATALOG.filter(item => (category === 'all' || item.category === category) && `${item.name}${item.detail}`.includes(search.trim())), [category, search]);
@@ -205,6 +247,20 @@ export default function App({ modelWarning = false }) {
   }, []);
 
   useEffect(() => { world.current?.update(latest.current); });
+  useEffect(()=>{persist();},[game.calendar,game.finance,game.social.contacts]);
+  useEffect(()=>{
+    if(state.loadVersion===careerLoad.current&&game.career?.lastPay&&game.career.lastPay!==lastPay.current){
+      notify(`工资到账 +${game.career.lastPay.amount} 生活币`);
+    }
+    lastPay.current=game.career?.lastPay;
+    careerLoad.current=state.loadVersion;
+    persist();
+  },[game.career]);
+  useEffect(()=>{
+    const count=game.sim.wellbeing?.accidents||0;
+    if(count>accidentCount.current)notify('没来得及上厕所，清洁已归零，需要洗澡');
+    accidentCount.current=count;
+  },[game.sim.wellbeing?.accidents]);
   useEffect(() => {
     if (onboarding) return;
     setSaved('saving');
@@ -214,8 +270,13 @@ export default function App({ modelWarning = false }) {
   useEffect(() => {
     const timer = setInterval(() => {
       const current = latest.current;
-      if (current.mode === 'live' && current.speed > 0) dispatch({ type: 'tick', speed: current.speed });
-    }, 1000);
+      const active=world.current?.activities.current;
+      if (current.mode === 'live' && current.speed > 0) dispatch({ type: 'tick', speed: current.speed,
+        context:{usingToilet:active?.type==='toilet'&&active.stage==='active',
+          sleeping:active?.type==='sleep'&&active.stage==='active',
+          activity:active?.stage==='active'?active.type:null,guestActive:active?.type==='guest'&&active.stage==='active',
+          laundry:active?.stage==='active'?active.task:null} });
+    }, 250);
     const backup = setInterval(() => persist(), 10000);
     const onHide = () => persist();
     window.addEventListener('pagehide', onHide);
@@ -233,8 +294,12 @@ export default function App({ modelWarning = false }) {
     if (next === 'paint') { setPanel('style'); setMobilePanel(true); }
   }
   function changeMode(next) {
+    if(office&&next!=='live'){notify('先下班回家，再编辑家园或居民');return;}
+    if(awayShopping(game)&&next!=='live'){notify('购物结束回家后再编辑');return;}
+    if(game.social.visit&&next!=='live'){notify('先送来访的朋友离开，再编辑家园');return;}
     if (onboarding && next !== 'avatar') return;
     if (next === mode) return;
+    dispatch({type:'life',value:{kind:'sleepStop'}});
     cancelPlacement(); setSelected(null); setInteraction(null); setActivity(null); setWalking(false);
     if (next === 'avatar') setDraft(game.avatar);
     setMode(next); setTool('select'); setMobilePanel(false);
@@ -308,10 +373,26 @@ export default function App({ modelWarning = false }) {
   eventHandler.current = event => {
     const current = latest.current;
     if (event.type === 'toast') notify(event.message);
+    if(event.type==='officePerson'){setWorkPerson(event.id);setModal('work');}
+    if(event.type==='guestInteract'){setSocialPerson(event.id);setModal('social');}
+    if(event.type==='social')dispatch({type:'social',value:event.value});
+    if(event.type==='life'){
+      if(event.value.kind==='shoppingStart'&&lifeAction(current.game,event.value)===current.game){
+        setActivity(null);notify(shoppingError(current.game)||'当前无法联系朋友，外出已取消');
+      }else dispatch({type:'life',value:event.value});
+    }
+    if(event.type==='buyMeal')dispatch({type:'buyMeal',recipe:event.recipe});
+    if(event.type==='conversation')dispatch({type:'dialogue',value:{kind:'open',documentId:'neighbor',contact:event.contact,name:event.name}});
+    if(event.type==='jobSearchReady'){setModal('jobs');setCareerFocus(v=>v+1);}
+    if(event.type==='departWork'){
+      const error=departureError(current.game);
+      setWalking(false);setActivity(null);setInteraction(null);
+      if(error){world.current.departingWork=false;notify(error);}else{dispatch({type:'career',value:{kind:'depart'}});setCareerFocus(v=>v+1);}
+    }
     if (event.type === 'neighbors') setNeighbors(event.neighbors);
     if (event.type === 'queue') setQueue(event.queue);
     if (event.type === 'dismissInteraction') setInteraction(null);
-    if (event.type === 'needGain') dispatch({ type:'needGain',need:event.need,amount:event.amount });
+    if (event.type === 'needGain') dispatch({ type:'needGain',need:event.need,amount:event.amount,stressRelief:event.stressRelief });
     if (event.type === 'fishCaught') {
       dispatch({ type:'fishCaught',fish:event.fish }); notify(`钓到了${event.fish.name}`);
     }
@@ -452,8 +533,9 @@ export default function App({ modelWarning = false }) {
       const data = JSON.parse(await file.text());
       if (!validateSave(data)) throw new Error('这不是有效的晴屿存档');
       const migrated=migrateGame(data);
+      if(atWork(migrated))await loadOfficeAssets();
       dispatch({ type: 'load', value:migrated }); setDraft(data.avatar); cancelPlacement();
-      setSelected(null); setMode(migrated.onboarding ? 'build':'avatar'); setActivity(null); setInteraction(null); setModal(null); setRoof(false);
+      setSelected(null); setMode(atWork(migrated)?'live':migrated.onboarding ? 'build':'avatar'); setActivity(null); setInteraction(null); setModal(null); setRoof(false);
       notify('欢迎回家，存档已恢复');
     } catch (error) { notify(error.message === '存档文件过大' ? error.message : '存档无法读取，现有世界未受影响'); }
     event.target.value = '';
@@ -463,6 +545,19 @@ export default function App({ modelWarning = false }) {
     if (!url) return;
     const a = document.createElement('a'); a.href = url; a.download = 'sunny-life.png'; a.click(); notify('这一刻，已留在相册里');
   }
+  function closeJobs(){setModal(null);world.current?.cancelActivity();}
+  function hireJob(jobId){
+    if(office||world.current?.activities.current?.type!=='jobSearch')return;
+    dispatch({type:'career',value:{kind:'hire',jobId}});
+    closeJobs();setCareerFocus(value=>value+1);notify(`已入职：${jobFor(jobId).title}`);
+  }
+  function handleCareerAction(action){
+    if(action.kind==='refreshment'){
+      const error=refreshmentError(latest.current.game,action.refreshment);
+      if(error){notify(error);return;}
+    }
+    dispatch({type:'career',value:action});
+  }
   const mood = Math.min(...Object.values(game.sim.needs)) < 25 ? '需要关心' : '惬意';
   const menuStyle = interaction?.anchor && window.innerWidth > 760 ? {
     left: Math.max(16, Math.min(window.innerWidth - 302, interaction.anchor.x + 12)),
@@ -470,7 +565,7 @@ export default function App({ modelWarning = false }) {
     bottom: 'auto', transform: 'none',
   } : undefined;
 
-  return <main className={`game-shell compact-hud mode-${mode} ${apartment?'residence-apartment':''} ${catalogOpen ? '' : 'catalog-collapsed'}`}>
+  return <main className={`game-shell compact-hud mode-${mode} ${office?'at-office':''} ${apartment?'residence-apartment':''} ${catalogOpen ? '' : 'catalog-collapsed'}`}>
     <div ref={worldNode} className="world-viewport" />
     {!ready && <div className="world-loading"><Sun size={38} /><strong>{worldError || '青禾镇的阳光，准备好了'}</strong>{worldError && <button className="primary-button" onClick={() => window.location.reload()}>重新加载</button>}</div>}
 
@@ -478,14 +573,15 @@ export default function App({ modelWarning = false }) {
       <div className="brand-block"><div className="brand-mark"><Home size={24} strokeWidth={1.6} /><span /></div><div><h1>晴屿<span>SUNNY LIFE</span></h1><p><MapPin size={11} /> 青禾镇 <span className="tiny-dot" /> 橡树巷 06</p></div></div>
       {onboarding ? <button className="text-button" onClick={()=>fileInput.current?.click()}><ArrowUpFromLine size={15}/>导入存档</button> :
         <div className="header-actions"><div className="wallet"><span className="coin"><Coins size={16} /></span><strong data-testid="budget">{formatMoney(game.budget)}</strong><span className="currency-label">生活币</span></div><span className="header-divider" /><IconButton icon={Save} label="存档管理" onClick={() => setModal('save')} /><button className="save-status" onClick={() => persist(true)}><span className={saved === 'error' ? 'error-dot' : 'status-dot'} />{saved === 'saving' ? '保存中' : saved === 'error' ? '未保存' : '已保存'}</button></div>}
+      <MusicControl />
     </header>
     {!onboarding && <nav className="mode-switch" aria-label="游戏模式">
       {[{ id: 'live', name: '生活', icon: Leaf }, { id: 'build', name: '建造', icon: Hammer }, { id: 'avatar', name: '角色', icon: CircleUserRound }].map(({ id, name, icon: Icon }) =>
-        <button key={id} aria-label={name} title={name} aria-pressed={mode === id} className={mode === id ? 'active' : ''} onClick={() => changeMode(id)}><Icon size={17} strokeWidth={1.8} /><span>{name}</span></button>)}
+        <button key={id} aria-label={name} title={name} disabled={office&&id!=='live'} aria-pressed={mode === id} className={mode === id ? 'active' : ''} onClick={() => changeMode(id)}><Icon size={17} strokeWidth={1.8} /><span>{name}</span></button>)}
     </nav>}
 
     {mode !== 'avatar' && <>
-      <button className="location-label" aria-label={apartment?'浏览公寓户型':'浏览青禾镇'} title={apartment?'公寓户型':'青禾镇地图'} onClick={() => setModal('map')}><span className="location-dot" /><span>{apartment?game.home.name:mode === 'live' ? '青禾镇' : game.home.name}</span><span className="location-separator">/</span><span className="floor-label">{apartment?'3F':mode === 'live' ? '地图' : '1F'}</span><ChevronDown size={12} /></button>
+      <button className="location-label" aria-label={office?'查看工作场所':apartment?'浏览公寓户型':'浏览青禾镇'} title={office?'工作场所':apartment?'公寓户型':'青禾镇地图'} onClick={() => office?world.current?.command('office'):setModal('map')}><span className="location-dot" /><span>{office?jobFor(game.career.jobId).company:apartment?game.home.name:mode === 'live' ? '青禾镇' : game.home.name}</span><span className="location-separator">/</span><span className="floor-label">{office||apartment?'3F':mode === 'live' ? '地图' : '1F'}</span><ChevronDown size={12} /></button>
       <div className="left-rail">
         {mode === 'build' ? <>
           <div className="tool-group">
@@ -500,7 +596,7 @@ export default function App({ modelWarning = false }) {
             <IconButton icon={Trash2} label="拆除家具或墙体" active={tool === 'delete'} onClick={() => changeTool('delete')} />
           </div>
           <div className="tool-group"><IconButton icon={Undo2} label="撤销" disabled={!state.past.length} onClick={() => history('undo')} /><IconButton icon={Redo2} label="重做" disabled={!state.future.length} onClick={() => history('redo')} /></div>
-        </> : <div className="tool-group"><IconButton icon={Home} label="回到家园视角" onClick={() => world.current?.command('home')} /><IconButton icon={MapIcon} label="青禾镇地图" onClick={() => setModal('map')} /><IconButton icon={Footprints} label="跟随居民" onClick={() => world.current?.command('follow')} /></div>}
+        </> : <div className="tool-group"><IconButton icon={Home} label="回到家园视角" onClick={() => world.current?.command('home')} /><IconButton icon={MapIcon} label="青禾镇地图" disabled={office} onClick={() => setModal('map')} /><IconButton icon={Footprints} label="跟随居民" onClick={() => world.current?.command('follow')} /></div>}
       </div>
 
       <div className="camera-controls">
@@ -517,7 +613,7 @@ export default function App({ modelWarning = false }) {
           <IconButton icon={Scan} label="自动剖墙" active={cutaway} onClick={() => setCutaway(v => !v)} />
           {!apartment&&<IconButton icon={Home} label={roof ? '隐藏屋顶' : '显示屋顶'} active={roof} onClick={() => setRoof(v => !v)} />}
           <IconButton icon={Grid2X2} label="显示建造网格" active={showGrid} onClick={() => setShowGrid(v => !v)} />
-          <IconButton icon={MapIcon} label="青禾镇地图" onClick={() => setModal('map')} />
+          <IconButton icon={MapIcon} label="青禾镇地图" disabled={office} onClick={() => setModal('map')} />
           <IconButton icon={Footprints} label="跟随居民" onClick={() => world.current?.command('follow')} />
           <IconButton icon={Gauge} label="轻量画质" active={lowQuality} onClick={()=>setLowQuality(value=>!value)} />
         </div></details>
@@ -559,19 +655,39 @@ export default function App({ modelWarning = false }) {
     </>}
 
     {mode === 'live' && <>
-      {!apartment&&<button className="fishing-entry surface" aria-label="钓鱼与鱼获" onClick={()=>setModal('fishing')}><Fish size={17}/><span>钓鱼</span>{game.sim.catches.length>0 && <small>{game.sim.catches.length}</small>}</button>}
-      <div className={`residence-tools surface ${apartment?'':'coastal'}`}>
-        {apartment?<><button aria-label="室内剖面" title="室内剖面" aria-pressed={!apartmentExterior} onClick={()=>showApartment(false)}><Sofa size={16}/><span>室内</span></button><button aria-label="整栋公寓" title="整栋公寓" aria-pressed={apartmentExterior} onClick={()=>showApartment(true)}><Building2 size={16}/><span>整栋</span></button><IconButton icon={ArrowLeftRight} label="切换住宅" onClick={()=>setModal('residence')}/></>:
+      {!apartment&&!office&&<button className="fishing-entry surface" aria-label="钓鱼与鱼获" onClick={()=>setModal('fishing')}><Fish size={17}/><span>钓鱼</span>{game.sim.catches.length>0 && <small>{game.sim.catches.length}</small>}</button>}
+      {!office&&<div className={`residence-tools surface ${apartment?'':'coastal'}`}>
+        {apartment?<><button aria-label="室内剖面" title="室内剖面" aria-pressed={!apartmentExterior} onClick={()=>showApartment(false)}><Sofa size={16}/><span>室内</span></button><button aria-label="整栋公寓" title="整栋公寓" aria-pressed={apartmentExterior} onClick={()=>showApartment(true)}><Building2 size={16}/><span>整栋</span></button><IconButton icon={CarFront} label="查看街景" onClick={()=>world.current?.command('street')}/><IconButton icon={ArrowLeftRight} label="切换住宅" onClick={()=>setModal('residence')}/></>:
           <button onClick={()=>setModal('residence')}><Building2 size={16}/><span>搬入公寓</span></button>}
-      </div>
+      </div>}
+      {office&&<div className="work-toolbar surface"><IconButton icon={BriefcaseBusiness} label="查看工位" onClick={()=>world.current?.command('office')}/><IconButton icon={Coffee} label="查看咖啡吧" onClick={()=>world.current?.command('officeCafe')}/><IconButton icon={LogOut} label="提前下班回家" disabled={game.career.phase==='leaving'} onClick={()=>handleCareerAction({kind:'leave'})}/></div>}
+      <WorkNotice game={game} onOpen={()=>setModal('work-event')}/>
+      {game.social.conflict&&!office&&<button className="social-notice surface" onClick={()=>setModal('conflict')}><Heart size={15}/>这次相处有些不愉快</button>}
+      {!office&&!game.social.conflict&&game.career.attendance.review&&<button className="social-notice surface" onClick={()=>setModal('attendance')}><BriefcaseBusiness size={15}/>缺勤记录需要复核</button>}
+      {!office&&!game.social.conflict&&!game.career.attendance.review&&game.career.attendance.noticeDay===game.sim.day&&
+        game.career.lastPaidDay!==game.sim.day&&game.career.attendance.lastChecked<game.sim.day&&<button className="social-notice surface" onClick={()=>setCareerFocus(v=>v+1)}><BriefcaseBusiness size={15}/>上班时间已到，请尽快到岗</button>}
+      {!office&&!game.social.conflict&&!game.career.attendance.review&&
+        !game.career.workplace?.event&&
+        (game.career.attendance.noticeDay!==game.sim.day||game.career.attendance.lastChecked>=game.sim.day||game.career.lastPaidDay===game.sim.day)&&
+        utilities(game).debt>0&&<button className="social-notice surface" onClick={()=>setModal('finance')}><Coins size={15}/>{utilities(game).overdue?'生活账单已逾期':'本期账单待缴'}</button>}
       <ResidentPanel game={game} activity={activity} walking={walking} Portrait={AvatarPortrait} onEdit={() => changeMode('avatar')} onCancel={() => world.current?.cancelActivity()} neighbors={neighbors} onChat={id => world.current?.startChat(id)} onTabKey={onTabKey} onAutonomy={value => dispatch({ type: 'sim', value: { autonomy: value } })}
         onOnlineChat={()=>world.current?.startOnlineChat()} onPlaceComputer={()=>{changeMode('build');setCategory('bedroom');beginPlace(ITEM_MAP.desk);}}
+        onJobSearch={()=>world.current?.startJobSearch()} onDepart={()=>world.current?.queue.add({kind:'work'})} onCareerAction={handleCareerAction} careerFocus={careerFocus}
+        onLifeCommand={command=>world.current?.queue.add(command)} onLife={value=>dispatch({type:'life',value})}
+        onUpgrade={()=>{world.current?.activities.cancel(true);dispatch({type:'upgradeHousing'});setInteraction(null);}}
+        onDialogue={value=>dispatch({type:'dialogue',value})}
+        onWorkplace={()=>{setWorkPerson(null);setModal('work');}} onWorkEvent={()=>setModal('work-event')}
+        onCalendar={()=>setModal('calendar')} onBills={()=>setModal('finance')} onMood={()=>setModal('mood')}
+        onSocial={()=>{setSocialPerson(null);setModal('social');}} onAttendance={()=>setModal('attendance')}
         queue={queue} onRemoveQueue={id=>world.current?.queue.remove(id)} onClearQueue={()=>world.current?.queue.clear()} onMoveQueue={id=>world.current?.queue.moveUp(id)} />
-      <TimeControls sim={game.sim} speed={speed} setSpeed={setSpeed} />
-      {interaction && (ITEM_MAP[interaction.type].activity === 'eat' ? <div className="interaction-menu meal-menu surface" style={menuStyle}>
+      <TimeControls sim={game.sim} speed={effectiveSpeed} setSpeed={setSpeed} onCalendar={()=>setModal('calendar')}/>
+      {interaction && (interaction.type==='tv'?<TelevisionMenu anchor={interaction.anchor} onClose={()=>setInteraction(null)}
+        onSelect={channel=>world.current?.startActivity(interaction.id,undefined,'watch',channel)}/>:
+        ITEM_MAP[interaction.type].activity === 'eat' ? <div className="interaction-menu meal-menu surface" style={menuStyle}>
         <div className="meal-menu-heading"><UtensilsCrossed size={17} /><span>{ITEM_MAP[interaction.type].name}</span><IconButton icon={X} label="关闭家具互动" onClick={() => setInteraction(null)} /></div>
         <div className="segmented" aria-label="餐点选择">{Object.entries(MEALS).map(([id, meal]) => <button key={id} aria-pressed={selectedMeal === id} className={selectedMeal === id ? 'active' : ''} onClick={() => setSelectedMeal(id)}>{meal.name}</button>)}</div>
-        <button className="primary-button" onClick={() => world.current?.startActivity(interaction.id, selectedMeal)}><Play size={14} />开始用餐<span>饱腹 +{MEALS[selectedMeal].amount}</span></button>
+        <div className="meal-price">{MEALS[selectedMeal].price} 生活币 · 饱腹 +{MEALS[selectedMeal].amount}</div>
+        <button className="primary-button" disabled={game.budget<MEALS[selectedMeal].price} onClick={() => world.current?.startActivity(interaction.id, selectedMeal)}><Play size={14} />开始用餐</button>
         {activityTypes(interaction.type).includes('washHands') && <button className="secondary-button" onClick={() => world.current?.startActivity(interaction.id, undefined, 'washHands')}><Droplets size={15} />洗手</button>}
       </div> : <div className="interaction-menu surface" style={menuStyle}><span>{ITEM_MAP[interaction.type].name}</span><button className="primary-button" onClick={() => world.current?.startActivity(interaction.id)}><Play size={14} />{ACTIVITIES[ITEM_MAP[interaction.type].activity].label}</button><IconButton icon={X} label="关闭家具互动" onClick={() => setInteraction(null)} /></div>)}
     </>}
@@ -616,7 +732,31 @@ export default function App({ modelWarning = false }) {
     <div className="world-meta"><span className="meta-mark">s.</span><span>属于你的日常</span><span className="meta-line" /><span>EARLY ACCESS 0.1</span></div>
     {toast && !modal && <div role="status" aria-label="游戏通知" className="toast"><span className="toast-check"><Check size={13} /></span>{toast}</div>}
     <input type="file" ref={fileInput} accept=".json,application/json" className="file-input" aria-label="导入晴屿存档" onChange={importSave} />
+    {game.dialogue.active&&<Modal title={activeDialogue(game).title} onClose={()=>dispatch({type:'dialogue',value:{kind:'close'}})}>
+      <DialoguePanel game={game} onAction={value=>dispatch({type:'dialogue',value})}/>
+    </Modal>}
+    {modal==='work'&&<Modal title="职场事务" wide onClose={()=>setModal(null)}>
+      <WorkplacePanel game={game} Portrait={AvatarPortrait} initialPerson={workPerson}
+        onAction={value=>dispatch({type:'career',value:{kind:'workplace',value}})} onEvent={()=>setModal('work-event')}
+        onFocus={id=>{setModal(null);world.current?.command('officePerson',{id});}}/>
+    </Modal>}
+    {modal==='work-event'&&<Modal title={game.career.workplace?.event?.type==='appraisal'?'绩效复核':WORK_EVENTS[game.career.workplace?.event?.type]?.title||'工作来讯'} onClose={()=>setModal(null)}>
+      <WorkEventBody game={game} Portrait={AvatarPortrait} onAction={value=>{
+        dispatch({type:'career',value:{kind:'workplace',value}});setModal(null);
+      }}/>
+    </Modal>}
+    {modal==='calendar'&&<Modal title="生活日历" wide onClose={()=>setModal(null)}><CalendarPanel game={game} onAction={value=>dispatch({type:'calendar',value})}/></Modal>}
+    {modal==='finance'&&<Modal title="生活账单" onClose={()=>setModal(null)}><BillsPanel game={game} onAction={value=>dispatch({type:'finance',value})}/></Modal>}
+    {modal==='mood'&&<Modal title="当前心绪" onClose={()=>setModal(null)}><MoodPanel game={game} onReflection={value=>dispatch({type:'reflection',value})}/></Modal>}
+    {modal==='social'&&<Modal title="朋友与恋爱" onClose={()=>setModal(null)}><SocialPanel game={game} Portrait={AvatarPortrait} initialId={socialPerson}
+      onInvite={(ids,kind)=>{if(world.current.guests.invite(ids,kind))setModal(null);}}
+      onAction={value=>{if(world.current.activities.current?.guestId)world.current.cancelActivity();dispatch({type:'social',value});setModal(null);}}
+      onInteract={(id,verb)=>{world.current.queue.add({kind:'guest',targetId:id,verb});setModal(null);}}
+      onOuting={id=>{world.current.queue.add({kind:'shopping',companionId:id});setModal(null);}}/></Modal>}
+    {modal==='conflict'&&<Modal title="关系摩擦" onClose={()=>setModal(null)}><ConflictPanel game={game} onResolve={value=>{dispatch({type:'social',value});setModal(null);}}/></Modal>}
+    {modal==='attendance'&&<Modal title="出勤记录" onClose={()=>setModal(null)}><AttendancePanel game={game} onAction={value=>{handleCareerAction({kind:'attendance',value});setModal(null);}}/></Modal>}
 
+    {modal==='jobs'&&<Modal title="青禾招聘" wide onClose={closeJobs}><JobListings game={game} onHire={hireJob}/></Modal>}
     {modal === 'save' && <Modal title="留住这个小世界" onClose={() => setModal(null)}>
       <div className="save-summary"><AvatarPortrait avatar={game.avatar} /><div><strong>{game.avatar.name}的{game.home.name}</strong><span>第 {game.sim.day} 天 · {game.home.furniture.length} 件家具 · {game.home.width * game.home.depth} m²</span></div><span className="status-dot" /></div>
       <div className="save-options"><button onClick={() => persist(true)}><Save size={20} /><span><strong>保存到浏览器</strong><small>{saved === 'saved' ? '当前进度已保存' : '保存当前进度'}</small></span><ChevronRight size={17} /></button><button onClick={exportSave}><ArrowDownToLine size={20} /><span><strong>导出存档</strong><small>Sunny Life · JSON</small></span><ChevronRight size={17} /></button><button onClick={() => fileInput.current?.click()}><ArrowUpFromLine size={20} /><span><strong>导入存档</strong><small>恢复已有的家园与居民</small></span><ChevronRight size={17} /></button><button onClick={downloadScreenshot}><Download size={20} /><span><strong>拍张纪念照</strong><small>当前场景 · PNG</small></span><ChevronRight size={17} /></button></div>
@@ -625,7 +765,7 @@ export default function App({ modelWarning = false }) {
     </Modal>}
     {modal === 'reset' && <Modal title="开启新的小日子？" onClose={() => setModal('save')}><p className="reset-warning">当前的房屋和居民会被替换。建议先导出存档，保留这个小世界。</p><div className="reset-actions"><button className="secondary-button" onClick={() => setModal('save')}>返回</button><button className="secondary-button" onClick={exportSave}>导出当前存档</button><button className="primary-button" onClick={() => { const next = newApartmentGame(false); dispatch({ type: 'load', value: next }); setDraft({...next.avatar,name:''}); cancelPlacement(); setSelected(null); setActivity(null); setInteraction(null); setMode('avatar'); setModal(null); notify('新的日常，从这里开始'); }}>重新开始</button></div></Modal>}
     {modal==='residence'&&<Modal title={apartment?'返回海岸住宅？':'搬入青禾公寓？'} onClose={()=>setModal(null)}>
-      <p className="reset-warning">当前住宅的装修与余额会单独保留，可随时切回。居民、需求、游戏时间和鱼获保持不变。</p>
+      <p className="reset-warning">当前住宅的装修会保留，可随时切回。搬家不改变余额、居民、需求和游戏时间。</p>
       <div className="reset-actions"><button className="secondary-button" onClick={()=>setModal(null)}>取消</button><button className="primary-button" onClick={moveHome}><Building2 size={16}/>{apartment?'返回海岸住宅':'确认搬入公寓'}</button></div>
     </Modal>}
     {modal === 'clear-lot' && <Modal title={apartment?'清空套内装修？':'清空建筑与家具？'} onClose={() => setModal(null)}><p className="reset-warning">{apartment?'收回家具并拆除套内隔墙，保留外墙、楼板和阳台。':'拆除所有墙体、地板并收回家具。'}居民和需求不会重置，此操作可以撤销。</p><div className="reset-actions"><button className="secondary-button" onClick={() => setModal(null)}>取消</button><button className="primary-button" onClick={clearLot}>{apartment?'确认清空套内':'确认清空地块'}</button></div></Modal>}

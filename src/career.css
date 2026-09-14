@@ -1,0 +1,50 @@
+.career-panel { display: grid; gap: 10px; font-size: 11px; }
+.career-job { display: flex; align-items: center; gap: 9px; color: var(--leaf-deep); }
+.career-job span { display: grid; gap: 3px; }
+.career-job strong { font-size: 13px; font-weight: 600; }
+.career-job small { color: var(--ink-secondary); font-size: 10px; }
+.career-meta,.career-shift { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
+.career-meta { flex-wrap: wrap; color: var(--ink-secondary); font-size: 10px; }
+.career-meta span { display: flex; align-items: center; gap: 4px; }
+.career-panel progress { display: block; width: 100%; height: 5px; accent-color: var(--leaf); }
+.career-pressure { display: flex; align-items: center; gap: 7px; }
+.career-pressure meter { flex: 1; min-width: 0; height: 7px; }
+.career-pressure output { width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
+.career-continuous { color: var(--ink-secondary); font-size: 10px; line-height: 1.5; }
+.career-command,.career-actions button { display: flex; justify-content: center; align-items: center; gap: 6px; min-height: 32px; border-radius: 5px; background: var(--field); padding: 5px 8px; font-size: 11px; }
+.career-command:not(:disabled):hover,.career-actions button:not(:disabled):hover { background: var(--leaf-light); color: var(--leaf-deep); }
+.career-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.career-actions button:first-child { grid-column: 1 / -1; }
+.career-actions button span { color: var(--ink-secondary); margin-left: auto; font-variant-numeric: tabular-nums; }
+.career-text { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; min-height: 28px; color: var(--ink-secondary); }
+.career-pay { display: flex; align-items: center; gap: 5px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 10px; color: var(--ink-secondary); }
+.career-pay strong { color: var(--leaf-deep); margin-left: auto; font-size: 12px; }
+.job-listings { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.job-listing { border: 1px solid var(--line); padding: 16px; border-radius: 6px; min-width: 0; }
+.job-listing > div { display: flex; align-items: center; gap: 9px; }
+.job-emblem { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; color: #fff; border-radius: 5px; }
+.job-listing h3 { font-size: 14px; line-height: 1.4; }
+.job-listing h3 small { display: block; font-size: 10px; font-weight: 400; color: var(--ink-secondary); margin-top: 3px; }
+.job-listing dl { display: grid; grid-template-columns: auto 1fr; gap: 10px; margin: 18px 0; font-size: 11px; }
+.job-listing dt { color: var(--ink-secondary); }
+.job-listing dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.job-listing .primary-button { width: 100%; min-height: 34px; padding: 6px; font-size: 12px; }
+.work-toolbar { position: absolute; top: 108px; left: 16px; display: flex; gap: 4px; padding: 4px; z-index: 4; }
+.work-toolbar .icon-button { width: 34px; height: 34px; flex-basis: 34px; }
+.resident-panel.career-tab .resident-panel-content { height: auto; max-height: min(390px,calc(100dvh - 270px)); overflow-y: auto; }
+.work-status { display: flex; align-items: center; gap: 6px; color: var(--ink-secondary); font-size: 10px; margin-top: 8px; }
+.at-office .resident-panel .resident:disabled { opacity: 1; cursor: default; }
+.at-office .work-toolbar { z-index: 5; }
+@media(max-width:760px) {
+  .at-office .resident-panel:not(.is-collapsed) { width: 252px; }
+  .resident-panel.career-tab .resident-panel-content { max-height: 250px; }
+  .resident-tabs > button { gap: 3px; white-space: nowrap; }
+  .career-actions { grid-template-columns: 1fr; }
+  .career-actions button { white-space: nowrap; }
+  .resident-panel .resident small { white-space: nowrap; }
+  .job-listings { grid-template-columns: 1fr; }
+  .job-listing { padding: 12px; }
+  .job-listing dl { margin: 12px 0; gap: 7px; }
+  .job-listing .primary-button { min-height: 36px; }
+  .work-toolbar { top: 108px; left: 12px; }
+}

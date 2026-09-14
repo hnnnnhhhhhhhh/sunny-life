@@ -11,12 +11,13 @@ async function boot(page) {
   await page.getByRole('button', { name: '建造', exact: true }).click();
 }
 
-test('all six Blender assets are used in the game and remain independently editable', async ({ page }) => {
+test('Blender assets and the imported sofa remain independently editable', async ({ page }) => {
   await boot(page);
   const initial = await page.evaluate(() => window.__sunny.diagnostics());
   expect(initial.assets.loaded.sort()).toEqual(['bed', 'chair', 'coffee', 'lamp', 'plant', 'sofa']);
   expect(initial.assets.failed).toEqual({});
-  expect(initial.furniture.filter(f => f.source === 'blender')).toHaveLength(6);
+  expect(initial.furniture.filter(f => f.source === 'blender')).toHaveLength(5);
+  expect(initial.furniture.find(f=>f.id==='sofa-1').source).toBe('neighborhood');
   await page.getByRole('button', { name: '放置拥抱休闲椅' }).click();
   expect(await page.evaluate(() => window.__sunny.diagnostics().previewSource)).toBe('blender');
   const point = await page.evaluate(() => window.__sunny.project(-3.5, 0.25, 6));
@@ -46,6 +47,7 @@ test('all six Blender assets are used in the game and remain independently edita
 });
 
 test('an unavailable GLB falls back without preventing editing or corrupting saves', async ({ page }) => {
+  await page.route('**/models/neighborhood/neighborhood.glb*', route => route.abort());
   await page.route('**/models/blender/sofa.glb?*', route => route.abort());
   await boot(page);
   const status = await page.evaluate(() => window.__sunny.diagnostics());

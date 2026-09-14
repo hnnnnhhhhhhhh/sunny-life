@@ -1,0 +1,17 @@
+.music-controls { position: relative; display: flex; align-items: center; flex: 0 0 auto; gap: 0; border-left: 1px solid var(--line); padding-left: 4px; }
+.music-controls .icon-button { width: 30px; height: 32px; flex-basis: 30px; }
+.music-controls[data-playing="true"] > button { color: var(--leaf); background: #e6eee4; }
+.music-controls[data-error="true"] > button { color: #aa6757; }
+.music-volume > summary { display: grid; place-items: center; list-style: none; width: 18px; height: 32px; cursor: pointer; border-radius: 4px; }
+.music-volume > summary::-webkit-details-marker { display: none; }
+.music-volume > summary:hover { background: #e6eee4; }
+.music-popover { position: absolute; top: calc(100% + 10px); right: -8px; z-index: 9; display: flex; align-items: center; gap: 8px; width: 190px; padding: 12px; background: var(--paper-glass); box-shadow: var(--shadow); border-radius: 6px; }
+.music-popover input { min-width: 0; width: 100%; accent-color: var(--leaf); }
+.music-popover output { font-size: 11px; min-width: 30px; font-variant-numeric: tabular-nums; }
+.music-popover svg { flex: 0 0 15px; }
+@media(max-width:760px) {
+  .music-controls { padding-left: 2px; }
+  .music-controls .icon-button { width: 26px; flex-basis: 26px; }
+  .music-volume > summary { width: 16px; }
+  .music-popover { right: auto; left: -90px; width: 178px; }
+}

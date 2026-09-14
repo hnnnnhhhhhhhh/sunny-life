@@ -30,14 +30,14 @@ test('all apartment furniture fits and every activity has a physical reachable p
   assert.deepEqual(findPath(g.home,g.sim,{x:0,z:9},grid),[]);
 });
 
-test('moving preserves both decorated homes, budgets and resident needs across save reload',()=>{
+test('moving preserves both decorated homes and the current shared wallet across save reload',()=>{
   const coast=newGame();coast.home.furniture[0].color='#abcdef';coast.budget=12345;coast.sim.needs.hunger=42;
   const apartment=switchResidence(coast,'apartment');
   apartment.home.furniture[0].color='#123456';apartment.budget=10000;
   assert.equal(validateSave(apartment),true);
   const reloaded=loadGame({getItem:key=>key===SAVE_KEY?JSON.stringify(apartment):null}).data;
   const restored=switchResidence(reloaded,'coastal');
-  assert.deepEqual(restored.home,coast.home);assert.equal(restored.budget,12345);
+  assert.deepEqual(restored.home,coast.home);assert.equal(restored.budget,10000);
   assert.equal(restored.sim.needs.hunger,42);
   const returned=switchResidence(restored,'apartment');
   assert.equal(returned.home.furniture[0].color,'#123456');assert.equal(returned.budget,10000);

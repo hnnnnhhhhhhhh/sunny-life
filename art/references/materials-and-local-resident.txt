@@ -1,0 +1,70 @@
+INTERIOR MATERIALS AND LOCAL RESIDENT
+
+Reference direction
+- Preserve the editable apartment and its restrained UI.
+- Use a directional window key, cooler fill, restrained room reflections,
+  soft shadows, and contact occlusion rather than a global orange filter.
+- Differentiate oak grain, linen weave, mineral plaster, honed stone, and
+  recessed brick mortar through color, normal, and roughness maps.
+- Surfaces are deterministic procedural PBR textures generated locally.
+  The image-generation service returned pending placeholders; none are used.
+
+Implementation
+- src/surface-patterns.js: five periodic texture fields, normal-map
+  derivation, mipmaps, and shared GPU textures.
+- src/surfaces.js: physical-scale projection and material treatment.
+  Existing authored color maps, dye names, and selected colors remain intact.
+- src/interior-renderer.js: Three.js SSAO, output color conversion, and
+  multisample targets. Bypassed in low-quality mode and outside apartments.
+- Day/night time is still controlled by the simulation.
+- No changes to furniture IDs, positions, prices, or save schema.
+
+User-provided character
+- The GLB and nested OBJ ZIP contain a static character, not an animated rig.
+- Local source GLB SHA-256:
+  35229180ad72679d66e6ba59480ee03ebd83a706f8cf5612d47cfe241638171e
+- Source: Mrs_Afton
+  https://sketchfab.com/3d-models/mrs-afton-4d7ab5b85b7947d3bf7eaf398461960e
+- Public redistribution permission remains unconfirmed.
+- Original files, modified .blend, GLB, and texture derivatives are confined
+  to the ignored .runtime/refined-resident directory. Do not copy them into
+  public/ or commit them without resolving redistribution permission.
+- The production build continues to use the separately licensed CC0 resident.
+
+Rebuild local playable character
+
+  npm run resident:refine -- --source=/absolute/path/to/mrs_afton.glb
+
+Open:
+
+  http://localhost:5186/?resident=refined
+
+Editable local Blender source:
+
+  .runtime/refined-resident/resident.blend
+
+The local Vite endpoint only serves an allowlist of three generated files.
+It is not installed into the production build or preview server.
+
+Adaptation
+- Fit the complete supplied mesh to the existing 29-bone interaction rig.
+- Reuse existing animation clips and IK contracts.
+- Separate skin, eyes, hair, clothing, shoes, and jewelry.
+- Normalize texture details so skin, hair, and clothes remain recolorable.
+- Retain source UV details and generate WebP/gzip delivery assets.
+- Create local hair variants from the supplied textured hair.
+- Add a sleep-footwear variant and preserve existing glasses controls.
+- The male body remains the existing CC0 model.
+- Clothing selections retain their saved values. The local source only has
+  one blouse; the cardigan variant has a looser silhouette, not a separately
+  authored jacket or fully simulated garment.
+
+Verification
+- npm test
+- npm run build
+- npx playwright test tests/browser/refined-interior.spec.js
+- CI=1 npx playwright test tests/browser/refined-interior.spec.js
+- Existing supplied-model and computer/daylight browser regressions.
+- Check screenshots of the actual room, skinning, hair variants, daily-life
+  actions, day/night, and a 390x844 mobile viewport.
+- Local character tests are skipped on CI machines without the private file.

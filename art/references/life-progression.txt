@@ -1,0 +1,73 @@
+Sunny Life: local life progression rules
+
+Time and self-care
+- One real second advances 0.5 game minutes at 1x, 1.0 at 2x, and 1.5 at 3x.
+- Simulation updates every 250ms. Hidden/offline wall time is not awarded.
+- Home motion uses 1x / 1.3x / 1.6x. Pausing stops simulation and activity motion.
+- Bed entry and reverse exit retain the existing contact-aware animation.
+- Active sleep interpolates from starting energy to at least 95 over 360 game minutes.
+- Sleep progress, partial energy and the bed ID survive reload; resuming needs a reachable bed.
+- Hunger, bladder, social and fun decay at 30% of their waking rates during active sleep.
+- Manual activity takes priority over autonomous self-care and laundry.
+
+Household
+- Hand-wash at an existing bathroom or kitchen sink: 30 game minutes.
+- Washed clothes remain wet until hung on the balcony/garden drying rack: 10 minutes.
+- Hung clothes dry passively for 180 minutes. Fresh dirty laundry appears on a later day.
+- Returning from work or shopping schedules dirty/wet clothes after immediate needs.
+- Physical wash/hang progress pauses when interrupted. Reload restores an unfinished task.
+- Shopping costs 80 once, takes 90 game minutes, and keeps the home camera.
+- The resident walks through the exit, is hidden while away, then returns.
+- Shopping earns partial fun/social benefits. Early return does not refund the outing.
+
+Food
+- Salad: 8 coins, 28 satiety.
+- Pancakes: 12 coins, 38 satiety.
+- Noodles: 10 coins, 48 satiety.
+- Steak: 45 coins, 82 satiety.
+- Household toast: free, 22 satiety, so an empty wallet cannot prevent self-care.
+- Food is paid once when its reachable action starts; eating gives incremental benefits.
+- Nutrition values are fictional game balance, not dietary guidance.
+
+Television
+- Nature, news, comedy and music have distinct animated canvas programs.
+- Each channel has different fun/stress rewards. Partial watching earns partial rewards.
+- Native dialog controls surround the TV click location and clamp to the viewport.
+
+Career
+- Three transferable career tracks, each with three company-size/job-rank stages.
+- New residents start with rank-1 openings at small firms.
+- Working gains 0.025 qualification points per game minute before the age modifier.
+- Rank 2 requires 40/50/60 qualification; rank 3 requires 140/160/180 and prior rank 2.
+- Higher jobs increase salary, scheduled hours and pressure.
+- Salary remains based on actual working time, once per shift day.
+- Each pay record retains its own job ID; changing jobs does not rewrite prior pay.
+- Two colleagues have persistent trust. Work stress, company transitions and choices affect trust.
+
+Dialogue documents
+- Import JSON from Life > Import Dialogue Document, at most 200KB and 12 documents.
+- A document has: id, title, start, nodes.
+- Each node has: id, speaker, text, choices.
+- Each choice has: id, label, next, and optional effects, flag, requiresFlag.
+- IDs: 1-60 letters/digits/underscore/hyphen; prototype-related IDs are forbidden.
+- Every destination must exist. At most 80 nodes and 5 choices per node.
+- Effects allow social, fun, stress, trust in [-10,10] and qualification in [-3,3].
+- No executable scripts, HTML injection or arbitrary money effects.
+- React renders text as text. Choosing pauses simulation and stores the active branch.
+- Visited nodes cannot reward again; a completed/closed contact/document locks until the next day.
+- Example: public/dialogue-example.json.
+
+Milestones
+- A game year is 28 game days, starting at age 24. This is a fictional compressed calendar.
+- Age 40 increases fatigue slightly and qualification gain; age 60 reduces movement to 85%.
+- Garden home: 14x11m, 45,000 coins, 8,000 lifetime wages, daily salary at least 500.
+- Villa: 16x14m, 120,000 coins, 40,000 lifetime wages, daily salary at least 1,000.
+- Housing purchases clear build undo/redo, so the purchase cannot be undone for a refund.
+- All residences now share the current wallet; legacy backup wallet snapshots are not restored.
+- Retirement: 180,000 savings before age 60, 90,000 at 60+, plus 20,000 lifetime wages.
+- Retirement ends employment and pays a fictional pension of 100 coins per new game day.
+- No age-based death, forced retirement or real-world health predictions.
+
+Delivery
+- Local implementation only until explicitly committed and deployed.
+- Private resident assets remain development-only and are not added to public output.

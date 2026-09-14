@@ -13,6 +13,17 @@ import residentLayout from './resident-layout.json' with { type:'json' };
 import { apartmentWalkable, isApartment } from './residence.js';
 import { createApartmentEnvironment, createApartmentGrid, dressApartment } from './apartment-models.js';
 import { createHomeLighting, daylightAt } from './daylight.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {surfaceStatus} from './surfaces.js';
+import {createInteriorRenderer} from './interior-renderer.js';
+import {atWork,departureError} from './career.js';
+import {awayShopping,shoppingError,motionRate,ageEffects} from './life.js';
+import {createDryingRack} from './household-props.js';
+import {HomeGuests} from './home-guests.js';
+import {utilities} from './finance.js';
+import {loadOfficeAssets,officeAssetStatus} from './office-assets.js';
+import {createOffice} from './office.js';
+import {moodState} from './needs.js';
 
 export class World {
   constructor(container, emit) {
@@ -39,10 +50,15 @@ export class World {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(lowQuality?0.5:Math.min(window.devicePixelRatio, 1.75));
     this.renderer.shadowMap.enabled = !lowQuality;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.VSMShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
+    const pmrem=new THREE.PMREMGenerator(this.renderer),room=new RoomEnvironment();
+    this.environmentMap=pmrem.fromScene(room,.06);
+    this.scene.environment=this.environmentMap.texture;
+    this.scene.environmentIntensity=.22;
+    room.dispose();pmrem.dispose();
     this.renderer.domElement.setAttribute('aria-label', '晴屿三维世界');
     this.renderer.domElement.setAttribute('data-testid', 'world-canvas');
     container.appendChild(this.renderer.domElement);
@@ -66,6 +82,7 @@ export class World {
       if (!this.cameraTransition) this.targetZoom = this.camera.zoom;
     });
     this.controls.addEventListener('start', () => { this.cameraTransition = null; });
+    if(!lowQuality)this.interiorRenderer=createInteriorRenderer(this.renderer,this.scene,this.camera);
     this.hemi = new THREE.HemisphereLight('#f5f6ef', '#82977b', 1.65);
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight('#fff0d5', 3.1);
@@ -77,8 +94,12 @@ export class World {
     this.sun.shadow.camera.near = 0.5; this.sun.shadow.camera.far = 100;
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.normalBias = 0.065;
-    this.sun.shadow.radius = 3;
+    this.sun.shadow.radius = 4;
+    this.sun.shadow.blurSamples = 8;
     this.scene.add(this.sun);
+    this.windowFill=new THREE.DirectionalLight('#e6efff',.35);
+    this.windowFill.position.set(-8,7,-10);
+    this.scene.add(this.windowFill);
     this.environmentSystem = createEnvironment();
     this.environmentSystem.ocean.setQuality(lowQuality);
     this.environment = this.environmentSystem.root;
@@ -163,6 +184,7 @@ export class World {
     if (!width || !height) return;
     this.width = width; this.height = height;
     this.renderer.setSize(width, height);
+    this.interiorRenderer?.resize(width,height);
     this.updateProjection();
   }
 
@@ -190,6 +212,7 @@ export class World {
     const { home, avatar } = game;
     const apartment=isApartment(home),residenceChanged=apartment!==isApartment(old?.game.home);
     if(state.lowQuality!==old?.lowQuality) {
+      if(!state.lowQuality&&!this.interiorRenderer)this.interiorRenderer=createInteriorRenderer(this.renderer,this.scene,this.camera);
       this.renderer.setPixelRatio(state.lowQuality?0.5:Math.min(window.devicePixelRatio,1.75));
       this.renderer.shadowMap.enabled=!state.lowQuality;
       const shadowSize=state.lowQuality?512:2048;
@@ -198,12 +221,16 @@ export class World {
       this.environmentSystem.ocean.setQuality(state.lowQuality);
       this.resize();
     }
+    if(!game.sim.autonomy&&this.autonomy.walking)this.autonomy.manual();
     if (!game.sim.autonomy && this.activities.current?.autonomous && this.activities.current.stage !== 'cancelling') this.activities.cancel(false);
     if (state.propertiesOpen !== old?.propertiesOpen || state.catalogOpen !== old?.catalogOpen) this.updateProjection();
     if (this.activities.current && (mode !== old?.mode || home !== old?.game.home || avatar !== old?.game.avatar || state.loadVersion !== old?.loadVersion)) {
       this.activities.cancel(true, undefined, true);
     }
-    if (old && (mode !== old.mode || state.loadVersion !== old.loadVersion)) this.queue.clear();
+    if (old && (mode !== old.mode || state.loadVersion !== old.loadVersion)){
+      this.queue.clear();this.workRequest=(this.workRequest||0)+1;this.departingWork=false;this.workArrival=false;
+      this.departingShopping=false;
+    }
     if(apartment&&!this.apartmentSystem) {
       this.apartmentSystem=createApartmentEnvironment();
       this.scene.add(this.apartmentSystem.root);
@@ -229,10 +256,16 @@ export class World {
       if (this.house) { this.worldRoot.remove(this.house); disposeModel(this.house); }
       this.house = houseModel(home, roof);
       if(apartment)dressApartment(this.house,home);
+      this.curtainMeshes=[];
+      this.house.traverse(node=>{if(node.userData.curtainCloth&&node.morphTargetInfluences)this.curtainMeshes.push(node);});
       this.worldRoot.add(this.house);
       this.houseKey = houseKey;
     }
     if (home !== old?.game.home) {
+      if(this.dryingRack){this.dryingRack.root.removeFromParent();this.dryingRack.dispose();}
+      this.dryingRack=createDryingRack(home);
+      this.dryingRack.root.position.y=surfaceHeight(home,this.dryingRack.root.position.x,this.dryingRack.root.position.z);
+      this.worldRoot.add(this.dryingRack.root);
       if(this.homeLighting){this.worldRoot.remove(this.homeLighting.root);disposeModel(this.homeLighting.root);}
       this.homeLighting=createHomeLighting(home,(x,z)=>surfaceHeight(home,x,z));
       this.worldRoot.add(this.homeLighting.root);
@@ -262,13 +295,16 @@ export class World {
     for (const [id, entry] of this.items) entry.mesh.visible = pending?.movingId !== id;
     if (avatar !== old?.game.avatar || !this.player || state.loadVersion !== old?.loadVersion) {
       const pos = this.player?.position.clone();
-      if (this.player) { this.player.userData.controller?.dispose(); this.worldRoot.remove(this.player); }
+      if (this.player) { this.player.userData.controller?.dispose(); this.player.removeFromParent(); }
       this.player = avatarModel(avatar);
       this.player.position.copy(pos || new THREE.Vector3(game.sim.x, surfaceHeight(home, game.sim.x, game.sim.z), game.sim.z));
       if (state.loadVersion !== old?.loadVersion) this.player.position.set(game.sim.x, surfaceHeight(home, game.sim.x, game.sim.z), game.sim.z);
       this.player.rotation.y = 0.3;
       this.worldRoot.add(this.player);
     }
+    if(!this.guests)this.guests=new HomeGuests(this);
+    if(old&&(home!==old.game.home||state.loadVersion!==old.loadVersion))this.guests.clear();
+    if(!old||state.loadVersion!==old.loadVersion)this.restoreGuest=game.social?.interaction||null;
     if (!this.marker) {
       this.marker = residentMarkerModel();
       this.worldRoot.add(this.marker);
@@ -331,6 +367,41 @@ export class World {
       if(apartment&&!studio)this.command(state.apartmentExterior?'apartmentExterior':'home');
       this.updateProjection();
     }
+    const office=atWork(game);
+    this.player.visible=!awayShopping(game);
+    this.marker.visible=!awayShopping(game);
+    if(old?.game.life?.shopping&&!awayShopping(game)){
+      this.player.position.set(game.sim.x,surfaceHeight(home,game.sim.x,game.sim.z),game.sim.z);
+      this.emit({type:'activity',activity:null});this.emit({type:'arrived'});
+    }
+    if(awayShopping(game)){
+      this.departingShopping=false;
+      this.emit({type:'activity',activity:{type:'shopping',stage:'active',label:game.life.shopping.companionId?'与朋友外出中':'购物中',progress:game.life.shopping.elapsed/90*100}});
+    }
+    if(mode==='live'&&!office&&!awayShopping(game)&&(!old||state.loadVersion!==old.loadVersion)){
+      if(game.life?.sleep){
+        if(!this.activities.start(game.life.sleep.bedId,undefined,{restoring:true}))
+          this.emit({type:'life',value:{kind:'sleepStop'}});
+      }
+      else if(['washing','hanging'].includes(game.life?.laundry.stage))
+        this.activities.startLaundry(game.life.laundry.stage==='washing'?'wash':'hang');
+    }
+    if(office&&!this.office&&officeAssetStatus().loaded){this.office=createOffice();this.scene.add(this.office.root);}
+    if(office&&(state.loadVersion!==old?.loadVersion||!atWork(old?.game||{})))this.office?.reset();
+    if(this.office)this.office.root.visible=office;
+    if(office){
+      this.worldRoot.visible=false;this.environment.visible=false;
+      if(this.apartmentSystem)this.apartmentSystem.root.visible=false;
+      this.scene.add(this.player);this.scene.add(this.marker);
+    }else if(this.player?.parent===this.scene){
+      this.worldRoot.add(this.player,this.marker);this.worldRoot.visible=mode!=='avatar';
+      this.player.position.set(game.sim.x,surfaceHeight(home,game.sim.x,game.sim.z),game.sim.z);
+      this.player.userData.controller?.play('Idle',0);
+    }
+    if(office!==atWork(old?.game||{})||(!old&&office)){
+      this.path=[];this.activities.cancel(true,undefined,true);this.departingWork=false;
+      this.emit({type:'arrived'});this.command(office?'office':'home');this.updateProjection();
+    }
     this.updateDaylight();
     this.renderer.domElement.style.cursor = pending || drawing || ['door', 'window'].includes(state.tool) ? 'crosshair' : state.tool === 'delete' ? 'not-allowed' : 'grab';
   }
@@ -381,6 +452,18 @@ export class World {
   }
 
   onClick(event) {
+    if(atWork(this.state?.game||{})){
+      if(!this.down||this.down.button!==0||Math.hypot(event.clientX-this.down.x,event.clientY-this.down.y)>6)return;
+      this.down=null;this.setRay(event);
+      const hit=this.raycaster.intersectObjects(this.office?.people.root.children||[],true).find(h=>{
+        if(!h.object.userData.officeNpcId)return false;
+        for(let n=h.object;n;n=n.parent)if(!n.visible)return false;
+        return true;
+      });
+      if(hit)this.emit({type:'officePerson',id:hit.object.userData.officeNpcId});
+      return;
+    }
+    if(awayShopping(this.state?.game||{})||this.departingShopping)return;
     if (this.draw) {
       const draw = this.draw, down = this.down;
       const moved = down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6;
@@ -402,6 +485,10 @@ export class World {
     if (!this.setRay(event)) return;
     const x = snap(this.intersection.x), z = snap(this.intersection.z);
     const { mode, tool, pending, game } = this.state;
+    if(mode==='live'){
+      const guest=this.raycaster.intersectObjects(this.guests?.root.children||[],true).find(h=>h.object.userData.guestId);
+      if(guest){this.emit({type:'guestInteract',id:guest.object.userData.guestId});return;}
+    }
     if(isApartment(game.home)&&this.state.apartmentExterior&&mode==='live') {
       this.emit({type:'apartmentView',exterior:false});this.command('home');return;
     }
@@ -443,6 +530,7 @@ export class World {
   }
 
   navigateTo(target) {
+    if(atWork(this.state.game))return false;
     if(isApartment(this.state.game.home)&&!apartmentWalkable(target.x,target.z))return false;
     if (terrainSurface(target.x, target.z).kind === 'water') {
       this.emit({ type: 'toast', message: '河面不能步行，请沿木桥通行' });
@@ -459,8 +547,8 @@ export class World {
     return true;
   }
 
-  startActivity(id, recipe, activity) {
-    return this.queue.add({ kind:'furniture',targetId:id,recipe,activity });
+  startActivity(id, recipe, activity, channel) {
+    return this.queue.add({ kind:'furniture',targetId:id,recipe,activity,channel });
   }
 
   startChat(id) {
@@ -473,6 +561,48 @@ export class World {
     if(!desk){this.emit({type:'toast',message:'家中还没有电脑桌，可在卧室家具中放置'});return false;}
     return this.startActivity(desk.id,undefined,'onlineChat');
   }
+  startJobSearch(){
+    const desk=this.state.game.home.furniture.find(f=>f.type==='desk');
+    if(!desk){this.emit({type:'toast',message:'先放置电脑桌'});return false;}
+    return this.startActivity(desk.id,undefined,'jobSearch');
+  }
+  startWork(){
+    const error=departureError(this.state.game);
+    if(error){this.emit({type:'toast',message:error});return false;}
+    this.departingWork=true;
+    const request=this.workRequest=(this.workRequest||0)+1;
+    this.emit({type:'activity',activity:{type:'work',stage:'loading',label:'正在加载办公室',progress:0}});
+    this.emit({type:'toast',message:'正在准备前往公司'});
+    loadOfficeAssets().then(()=>{
+      if(this.disposed||request!==this.workRequest||!this.departingWork)return;
+      const target=isApartment(this.state.game.home)?{x:6.8,z:0}:{x:0,z:this.state.game.home.depth/2+.65};
+      if(!this.navigateTo(target)){this.departingWork=false;this.emit({type:'activity',activity:null});return;}
+      const end=this.path.at(-1);
+      if(!end||Math.hypot(end.x-target.x,end.z-target.z)>.5){
+        this.path=[];this.destination.visible=false;this.departingWork=false;
+        this.emit({type:'arrived'});this.emit({type:'activity',activity:null});this.emit({type:'toast',message:'住宅出口被挡住，暂时无法出门'});return;
+      }
+      this.workArrival=true;
+      this.emit({type:'activity',activity:{type:'work',stage:'approach',label:'出门上班',progress:0}});
+    }).catch(()=>{if(!this.disposed&&request===this.workRequest){this.departingWork=false;this.emit({type:'activity',activity:null});this.emit({type:'toast',message:'办公室加载失败，存档未改变，请重试'});}});
+    return true;
+  }
+
+  startShopping(companionId){
+    const error=shoppingError(this.state.game);
+    if(error){this.emit({type:'toast',message:error});return false;}
+    const target=isApartment(this.state.game.home)?{x:6.8,z:0}:{x:0,z:this.state.game.home.depth/2+.65};
+    if(!this.navigateTo(target))return false;
+    const end=this.path.at(-1);
+    if(!end||Math.hypot(end.x-target.x,end.z-target.z)>.5){
+      this.path=[];this.destination.visible=false;this.emit({type:'arrived'});
+      this.emit({type:'toast',message:'住宅出口被挡住，暂时无法购物'});return false;
+    }
+    this.departingShopping=true;
+    this.shoppingCompanion=companionId;
+    this.emit({type:'activity',activity:{type:'shopping',stage:'approach',label:'出门购物',progress:0}});
+    return true;
+  }
 
   startFishing(id) {
     if(isApartment(this.state.game.home)){this.emit({type:'toast',message:'钓鱼可在海岸住宅进行'});return false;}
@@ -484,12 +614,32 @@ export class World {
   }
 
   cancelActivity() {
+    if(awayShopping(this.state.game))this.emit({type:'life',value:{kind:'shoppingReturn'}});
+    if(this.departingShopping)this.emit({type:'activity',activity:null});
+    this.departingShopping=false;
+    if(this.departingWork)this.emit({type:'activity',activity:null});
+    this.workRequest=(this.workRequest||0)+1;this.departingWork=false;this.workArrival=false;
     this.autonomy.manual();
     if (this.activities.current) this.activities.cancel(false);
     else { this.path=[]; this.destination.visible=false; this.emit({ type:'arrived' }); }
   }
 
   command(action, place) {
+    if(atWork(this.state?.game||{})){
+      if(action==='officePerson'){
+        const point=this.office?.people.point(place.id);
+        if(point)this.cameraTransition={position:point.clone().add(new THREE.Vector3(7,6,9)),
+          target:point.clone().add(new THREE.Vector3(0,1,0)),zoom:this.width<760?1.3:1.8};
+        return;
+      }
+      const cafe=action==='officeCafe';
+      if(['office','officeCafe','home','follow'].includes(action)){
+        this.cameraTransition={position:new THREE.Vector3(cafe?17:15,cafe?11:18,cafe?13:21),
+          target:new THREE.Vector3(cafe?8:1.5,.5,cafe?-1:0),zoom:this.width<760?cafe?1.8:1.1:cafe?2.2:1.45};
+        return;
+      }
+      if(!['zoomIn','zoomOut','rotateLeft','rotate','tiltUp','tiltDown','projection','fullscreen'].includes(action))return;
+    }
     const apartment=isApartment(this.state?.game.home);
     if(apartment&&['home','follow','dining','activity','television','computer'].includes(action))this.emit({type:'apartmentView',exterior:false});
     if(apartment&&action==='apartmentExterior') {
@@ -498,6 +648,11 @@ export class World {
     }
     if(apartment&&action==='home') {
       this.cameraTransition={position:new THREE.Vector3(17,22,26),target:new THREE.Vector3(.5,.9,.7),zoom:this.width<760?1.1:1.9};
+      return;
+    }
+    if(apartment&&action==='street'){
+      this.emit({type:'apartmentView',exterior:true});
+      this.cameraTransition={position:new THREE.Vector3(23,33,40),target:new THREE.Vector3(0,-2.8,11),zoom:this.width<760?.70:1.0};
       return;
     }
     if (action === 'home') {
@@ -567,10 +722,27 @@ export class World {
     this.sun.color.copy(light.sunColor);this.sun.intensity=light.sun;
     this.sun.position.copy(light.sunPosition);
     this.hemi.color.copy(light.sunColor);this.hemi.groundColor.copy(light.ground);this.hemi.intensity=light.ambient;
-    this.homeLighting?.update(light.lamps);
+    const interior=isApartment(this.state.game.home)&&!studio;
+    if(interior)this.sun.position.z=-16;
+    this.sun.intensity*=interior?.84:1;
+    this.hemi.intensity*=interior?.65:.9;
+    this.hemi.color.copy(light.sunColor).lerp(new THREE.Color('#e5edfa'),light.daylight);
+    this.windowFill.intensity=(interior?.52:.18)*light.daylight;
+    this.windowFill.visible=this.windowFill.intensity>.005;
+    this.scene.environmentIntensity=.006+light.daylight*(studio?.30:.22);
+    const extent=interior?13:studio?3:32;
+    Object.assign(this.sun.shadow.camera,{left:-extent,right:extent,top:extent,bottom:-extent});
+    this.sun.shadow.camera.updateProjectionMatrix();
+    this.sun.shadow.normalBias=interior?.04:.045;
+    this.homeLighting?.update(light.lamps*(utilities(this.state.game).power?1:0));
     this.homeLighting?.setCeilingVisible(!!this.state.roof||!!this.state.apartmentExterior);
     this.apartmentSystem?.setNight(light.lamps);
     this.environmentSystem.ocean.setDaylight(light);
+    if(atWork(this.state.game)){
+      this.scene.background.set('#c5d0d5');this.scene.fog.color.copy(this.scene.background);
+      this.sun.intensity=1.4;this.sun.position.set(-10,18,10);
+      this.hemi.intensity=1.2;this.hemi.color.set('#eef4ff');this.scene.environmentIntensity=.25;
+    }
   }
 
   animate(time) {
@@ -590,10 +762,21 @@ export class World {
     }
     if (this.state && this.player) {
       const { mode, game, speed } = this.state;
+      const motion=motionRate(speed);
+      const ambientDelta=mode==='live'?dt*motion:0;
+      if(!atWork(game))this.guests?.update(ambientDelta);
+      this.dryingRack?.update(game.life?.laundry.stage,this.ambientTime||0);
+      if(isApartment(game.home))this.apartmentSystem?.update(ambientDelta);
+      this.ambientTime=(this.ambientTime||0)+ambientDelta;
+      for(const [index,mesh] of (this.curtainMeshes||[]).entries())
+        mesh.morphTargetInfluences[0]=.5+.5*Math.sin(this.ambientTime*.65+index*.7);
+      if(atWork(game)){
+        this.office?.update(game,this.player,mode==='live'?dt*speed:0,mode==='live'?dt*motion:0);
+      }else if(!awayShopping(game)){
       const walking = mode === 'live' && speed > 0 && this.path.length > 0;
       if (walking) {
         const pos = this.player.position;
-        let step=dt*2.5*speed;
+        let step=dt*2.5*motion*ageEffects(game).movement;
         while(this.path.length && step>0) {
           const next=this.path[0],dx=next.x-pos.x,dz=next.z-pos.z,distance=Math.hypot(dx,dz);
           if(distance>0.001)this.player.rotation.y=Math.atan2(dx,dz);
@@ -607,6 +790,8 @@ export class World {
           this.destination.visible=false;
           this.emit({type:'position',x:pos.x,z:pos.z});
           if(!this.activities.arrive())this.emit({type:'arrived'});
+          if(this.workArrival){this.workArrival=false;this.queue.clear();this.emit({type:'departWork'});}
+          if(this.departingShopping){this.departingShopping=false;this.queue.clear();this.emit({type:'life',value:{kind:'shoppingStart',companionId:this.shoppingCompanion}});}
           this.arrivalActivity=null;
         }
         pos.y = surfaceHeight(game.home, pos.x, pos.z) + Math.abs(Math.sin(time * 0.009 * speed)) * 0.026;
@@ -614,11 +799,16 @@ export class World {
           this.emit({ type: 'position', x: pos.x, z: pos.z }); this.lastPositionEmit = time;
         }
       } else this.player.position.y = surfaceHeight(game.home, this.player.position.x, this.player.position.z);
-      this.activities.update(dt * (mode === 'live' ? speed : 1), walking);
+      this.activities.update(dt * (mode === 'live' ? motion : 1), walking);
+      if(this.restoreGuest&&!this.activities.current&&game.social.visit?.stage==='active'&&!this.path.length){
+        const pending=this.restoreGuest;this.restoreGuest=null;
+        this.activities.startGuest(pending.id,pending.verb);
+      }
       if (!this.player.userData.controller) {
         const swing = walking ? Math.sin(time * 0.009 * speed) * 0.48 : 0;
         this.player.userData.legs.forEach((leg, i) => { leg.rotation.x = swing * (i ? -1 : 1); });
         this.player.userData.arms.forEach((arm, i) => { arm.rotation.x = swing * (i ? 1 : -1) * 0.65; });
+      }
       }
       this.marker.position.copy(this.player.userData.controller ? this.player.userData.controller.point('Head') : this.player.position);
       this.marker.position.y += (this.player.userData.controller ? 0.6 : 2.65) * game.avatar.height + Math.sin(time * 0.002) * 0.045;
@@ -631,6 +821,8 @@ export class World {
         }
       }
       this.npcs.forEach(npc => {
+        npc.mesh.visible=!game.social?.visit?.ids.includes(npc.id);
+        if(atWork(game))return;
         if (mode !== 'live' || !speed || isApartment(game.home)) return;
         const { mesh, data } = npc;
         if (npc.busy) {
@@ -650,10 +842,17 @@ export class World {
           mesh.userData.controller.update(dt * speed * 0.55);
         } else mesh.userData.legs.forEach((leg, i) => { leg.rotation.x = Math.sin(time * 0.005) * 0.22 * (i ? 1 : -1); });
       });
-      for (const { mesh } of this.items.values()) mesh.userData.screenPlayback?.update(mode === 'live' ? dt * speed : 0);
+      for (const { mesh } of this.items.values()) mesh.userData.screenPlayback?.update(mode === 'live' ? dt * motion : 0);
       for (const { mesh } of this.items.values()) mesh.userData.computerPlayback?.update(mode === 'live' ? dt * speed : 0);
-      this.queue.update();
-      this.autonomy.update(dt * speed);
+      if(!atWork(game)&&!awayShopping(game)){this.queue.update();if(!this.departingWork&&!this.departingShopping)this.autonomy.update(dt * motion);}
+      const mood=moodState(game);
+      if(this.marker.userData.moodColor!==mood.color){
+        this.marker.traverse(node=>{if(node.isMesh){
+          if(!node.userData.moodMaterial){node.material=node.material.clone();node.userData.moodMaterial=true;}
+          node.material.color.set(mood.color);
+        }});
+        this.marker.userData.moodColor=mood.color;
+      }
     }
     this.controls.update();
     for (const group of this.house?.userData.wallGroups || []) {
@@ -666,7 +865,8 @@ export class World {
       const cut = !this.state.roof && !exterior && this.state.cutaway !== false && inFront;
       full.visible = !cut; low.visible = cut;
     }
-    this.renderer.render(this.scene, this.camera);
+    if((isApartment(this.state?.game.home)||atWork(this.state?.game||{}))&&this.state.mode!=='avatar'&&!this.state.lowQuality)this.interiorRenderer.render(this.camera);
+    else this.renderer.render(this.scene, this.camera);
   }
 
   project(x, y, z) {
@@ -703,10 +903,14 @@ export class World {
     });
     return {
       samples, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles,
-      position: this.player?.position.toArray(), pathLength: this.path.length, mode: this.state?.mode,
+      position: this.player?.position.toArray(), playerVisible:this.player?.visible,
+      laundry:this.state?.game.life?.laundry, pathLength: this.path.length, mode: this.state?.mode,
       camera: { type: this.camera.type, position: this.camera.position.toArray(), target: this.controls.target.toArray(), polar: this.controls.getPolarAngle(), azimuth: this.controls.getAzimuthalAngle() },
       walls: this.house.userData.wallGroups.map(({ wall, full }) => ({ id: wall.id, full: full.visible })),
-      assets: blenderAssetStatus(), furniture,
+      assets: blenderAssetStatus(), surfaces:surfaceStatus(), furniture,
+      workplace:atWork(this.state.game)?this.office?.diagnostics():null,mood:moodState(this.state.game),
+      guests:this.guests?.diagnostics()||[],utilities:utilities(this.state.game),
+      curtains:(this.curtainMeshes||[]).map(mesh=>({source:'neighborhood',weight:mesh.morphTargetInfluences[0]})),
       residence:isApartment(this.state.game.home)?this.apartmentSystem.diagnostics():{style:'coastal'},
       previewSource: this.preview?.userData.source || null,
       environment: { landmarks: this.environmentSystem.assets, waterTime: this.environmentSystem.waterTime(), waterSamples, grass: this.environmentSystem.grass.diagnostics(), ocean:this.environmentSystem.ocean.diagnostics() },
@@ -724,7 +928,8 @@ export class World {
       handwashing: this.activities.handwashing?.diagnostics() || null,
       fishing: this.activities.fishing?.diagnostics() || null,
       queue: this.queue.items.map(item=>({id:item.id,kind:item.kind,targetId:item.targetId,label:item.label})),
-      autonomy: { enabled: this.state.game.sim.autonomy, blocked: this.autonomy.blocked, cooldown: this.autonomy.cooldown, active: !!this.activities.current?.autonomous },
+      autonomy: { enabled: this.state.game.sim.autonomy, blocked: this.autonomy.blocked, cooldown: this.autonomy.cooldown, active: !!this.activities.current?.autonomous,
+        walking:this.autonomy.walking,leisureCount:this.autonomy.leisureCount,lastLeisureId:this.autonomy.lastLeisureId },
       postureUp: new THREE.Vector3(0, 1, 0).applyQuaternion(this.player.quaternion).toArray(),
       neighbors: isApartment(this.state.game.home)?[]:this.npcs.map(npc => ({ id: npc.id, name: npc.data.name, position: npc.mesh.position.toArray(), rotation: npc.mesh.rotation.y, busy: npc.busy, clip: npc.mesh.userData.controller?.name })),
       televisions: [...this.items].filter(([, item]) => item.mesh.userData.screenPlayback).map(([id, item]) => {
@@ -746,7 +951,8 @@ export class World {
   }
 
   screenshot() {
-    this.renderer.render(this.scene, this.camera);
+    if(isApartment(this.state?.game.home)&&this.state.mode!=='avatar'&&!this.state.lowQuality)this.interiorRenderer.render(this.camera);
+    else this.renderer.render(this.scene, this.camera);
     return this.renderer.domElement.toDataURL('image/png');
   }
 
@@ -782,6 +988,10 @@ export class World {
     for (const object of [this.grid, this.apartmentGrid, this.selection, this.hoverOutline, this.destination].filter(Boolean)) {
       object.geometry.dispose(); object.material.dispose();
     }
+    this.guests?.dispose();this.dryingRack?.dispose();
+    this.office?.dispose();if(this.office)disposeModel(this.office.root);
+    this.interiorRenderer?.dispose();
+    this.environmentMap.dispose();
     this.renderer.dispose();
     canvas.remove();
   }

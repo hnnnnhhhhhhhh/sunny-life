@@ -50,3 +50,17 @@ Quaternius, Ultimate Modular Women / Men, CC0 1.0.
 https://quaternius.com/packs/ultimatemodularwomen.html
 https://quaternius.com/packs/ultimatemodularcharacters.html
 https://creativecommons.org/publicdomain/zero/1.0/
+
+Additional neighborhood models:
+GlamVelvetSofa by Eric Chadwick / Wayfair LLC, CC BY 4.0.
+https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/GlamVelvetSofa
+Curtains Double by Quaternius, CC0.
+https://poly.pizza/m/kkeII96j9N
+Car Kit by Kenney, CC0.
+https://kenney.nl/assets/car-kit
+See ../neighborhood/LICENSE.txt for adaptation details.
+
+Isometric office by Companion_Cube, CC BY 4.0.
+https://sketchfab.com/3d-models/isometric-office-d31464eed8044190911b221648aca432
+Resized textures, merged static geometry, added interactive work facilities.
+See ../office/LICENSE.txt for full attribution.

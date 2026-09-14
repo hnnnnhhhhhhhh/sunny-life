@@ -7,17 +7,23 @@ import layout from './resident-layout.json' with { type:'json' };
 import {downloadAsset} from './asset-download.js';
 
 let residentAsset, loading, loadError;
+let activeManifest=manifest;
 const materials = new Map();
 
 export function loadResidentAssets(onProgress) {
   if (loading) return loading;
   loading = (async () => {
     try {
-      const compressed=manifest.compressedFile&&typeof DecompressionStream!=='undefined';
-      const file=compressed?manifest.compressedFile:manifest.file;
-      const hash=compressed?manifest.compressedSha256:manifest.sha256;
+      if(import.meta.env.DEV&&new URLSearchParams(location.search).get('resident')==='refined'){
+        const response=await fetch('/__local-resident/manifest.json');
+        if(!response.ok)throw new Error('Local refined resident has not been built.');
+        activeManifest=await response.json();
+      }
+      const compressed=activeManifest.compressedFile&&typeof DecompressionStream!=='undefined';
+      const file=compressed?activeManifest.compressedFile:activeManifest.file;
+      const hash=compressed?activeManifest.compressedSha256:activeManifest.sha256;
       let buffer=await downloadAsset(`${import.meta.env.BASE_URL}${file}?v=${hash.slice(0,12)}`,{
-        onProgress,expectedBytes:compressed?manifest.compressedBytes:manifest.bytes,decodedBytes:manifest.bytes,
+        onProgress,expectedBytes:compressed?activeManifest.compressedBytes:activeManifest.bytes,decodedBytes:activeManifest.bytes,
       });
       const signature=new Uint8Array(buffer,0,Math.min(2,buffer.byteLength));
       // HTTP Content-Encoding may already have been decoded by the browser.
@@ -39,6 +45,20 @@ export function loadResidentAssets(onProgress) {
 
 function coloredMaterial(original, avatar) {
   const role = original.name.replace('Resident_', '');
+  if(original.userData.supplied_character){
+    const role=original.userData.surface_role;
+    const source={Skin:avatar.skin,Hair:avatar.hairColor,Top:avatar.top,Trousers:avatar.pants,Shoes:avatar.shoes}[role];
+    if(!source)return original;
+    const references={Skin:'#e5b896',Hair:'#574034',Top:'#bdc9b5',Trousers:'#677d78',Shoes:'#eee5d1'};
+    const key=`${original.uuid}:${source}`;
+    if(!materials.has(key)){
+      const next=original.clone(),reference=new THREE.Color(references[role]),color=new THREE.Color(source);
+      if(original.userData.normalized_tint)next.color.copy(color);
+      else for(const axis of ['r','g','b'])next.color[axis]=Math.min(3,color[axis]/Math.max(.025,reference[axis]));
+      materials.set(key,next);
+    }
+    return materials.get(key);
+  }
   if (role.startsWith('ArtSkin') || role.startsWith('ArtHair') || role.startsWith('ArtBrows')) {
     const color = role.startsWith('ArtSkin') ? avatar.skin : avatar.hairColor;
     const key = `${original.uuid}:${color}`;
@@ -204,6 +224,25 @@ class ResidentAnimator {
     this.lastTarget = target.clone();
   }
 
+  idlePose() {
+    const phase=this.time%24;
+    const glance=Math.sin(Math.max(0,phase-3)*.7)*THREE.MathUtils.smoothstep(phase,3,5)*(1-THREE.MathUtils.smoothstep(phase,8,10));
+    const stretch=Math.sin(THREE.MathUtils.clamp((phase-15)/4,0,1)*Math.PI);
+    this.bones.get('Head').rotation.y+=glance*.16;
+    this.bones.get('Neck').rotation.x-=stretch*.035;
+    for(const [i,side] of ['L','R'].entries()){
+      this.bones.get(`UpperArm_${side}`).rotation.z+=(i?1:-1)*stretch*.055;
+      this.bones.get(`Forearm_${side}`).rotation.x-=stretch*.10;
+    }
+    this.root.updateMatrixWorld(true);
+  }
+  discomfortPose(severity=1){
+    this.bones.get('Head').rotation.x+=.14*severity;
+    this.bones.get('Chest').rotation.x+=.04*severity;
+    for(const side of ['L','R'])this.bones.get(`Forearm_${side}`).rotation.x-=.15*severity;
+    this.root.updateMatrixWorld(true);
+  }
+
   point(name) {
     return this.bones.get(name).getWorldPosition(new THREE.Vector3());
   }
@@ -317,7 +356,7 @@ class ResidentAnimator {
     return {
       source: 'blender-resident', clip: this.name,
       bones: this.bones.size, height: this.avatar.height, outfit: this.avatar.outfit || 'jacket', base: this.avatar.base || 'female',
-      artist: manifest.artist || 'Sunny Life',
+      artist: activeManifest.artist || 'Sunny Life',
       mouth: this.point('Mouth').toArray(), hand: this.point('Hand_R').toArray(),
       hips: this.point('Hips').toArray(), head: this.point('Head').toArray(),
       shoulders: ['UpperArm_L','UpperArm_R'].map(name=>this.point(name).toArray()),
@@ -340,5 +379,5 @@ class ResidentAnimator {
 }
 
 export function residentAssetStatus() {
-  return { loaded: !!residentAsset, error: loadError || null, generator: manifest.generator };
+  return { loaded: !!residentAsset, error: loadError || null, generator: activeManifest.generator,localOnly:!!activeManifest.localOnly };
 }

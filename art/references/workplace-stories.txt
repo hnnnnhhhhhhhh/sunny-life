@@ -1,0 +1,89 @@
+Sunny Life: workplace cast, projects and consequences
+
+Source
+- Adapted from the user-provided "NPC人物设定.md".
+- All four characters are fictional game characters, not claims about real people.
+- Visual appearances use existing licensed, animated resident models with distinct
+  bodies, hair, clothes, glasses and name labels. The input supplies personalities,
+  not exact visual reference images.
+- The private local resident policy remains unchanged.
+
+Roster and hierarchy
+- Rank 1 / small company: Danbao.
+- Rank 2 / medium company: Danbao, Shuijie, Zhuoge.
+- Rank 3 / large company: all four, including Dayanzei.
+- Player -> Danbao OR Shuijie -> Zhuoge -> Dayanzei.
+- Team leader can be switched between shifts at rank 2+.
+- The other team leader is a cross-team partner, not another direct supervisor.
+- Existing legacy friend relationships remain in saves but are not office managers.
+
+Project clock
+- Each new shift receives one project with an initial 360 game minutes of work.
+- Paid attendance is distinct from productive project progress. Required meetings
+  and waiting do not earn project progress, but do not remove already earned salary.
+- Three interruptions arrive after 45, about 155, and about 280 paid work minutes.
+- The exact second/third checkpoint varies with the saved project number.
+- A pending message consumes working time; after 30 unattended work minutes its
+  explicitly defined default decision is taken once and recorded.
+- Opening workplace/project/event dialogs pauses simulation for reading. The chosen
+  meeting/coordination cost is applied as real game minutes after closing.
+- At high stress, focused production slows to 80%.
+- Report action: 10 minutes, at least 60 paid work minutes between reports.
+- Submission is possible after 60% completion, takes 10 minutes, and locks the
+  submitted artifact. Submitting early protects the scope but risks a poor review.
+
+NPC behavior and knowledge
+- Each NPC saves trust, closeness, interest, energy, hunger, mood, stress,
+  reported progress, and a pending handoff.
+- Trust, closeness and project interest are separate values. Closeness never removes
+  a contribution-sharing condition.
+- NPCs learn project progress only from direct assignment, a progress report,
+  explicit escalation, or submission.
+- High-level interventions require shared evidence of at least 20% progress.
+- Danbao: explicit small tasks have a short delay; open-ended complex tasks have
+  substantially longer delay. Fatigue, hunger, stress, mood and interest can delay work.
+- Shuijie: real help and quick organization, but weak contribution records can
+  transfer credit away from the player.
+- Zhuoge: coordinates resources after demonstrated value, often with expanded scope.
+- Dayanzei: first grants useful direction and resources, then gradually reveals
+  uneven allocation and accountability over separate projects.
+- Handoffs progress from promised -> real artifact -> player acceptance.
+- Promises do not advance the player's task. Artifacts can be credited only once.
+- One handoff and one follow-up per NPC per project prevent repeated reward farming.
+
+Narrative progression
+- Danbao: ambiguous direction, written options and responsibility boundaries.
+- Shuijie / Zhuoge: shared ownership, acceptance criteria and scaling demands.
+- Dayanzei's five stages occur at most once per project:
+  vision -> real support -> biased allocation -> unequal standards -> informed approval.
+- Each stage is driven by an observable decision, not a reveal in a character bio.
+- Scope negotiation, written evidence, contribution ledgers and reporting affect the
+  actual minutes, help, ownership, performance and job retention.
+- Full event and choice journal is saved, capped at 60 entries; 20 reviews are retained.
+
+Performance and dismissal
+- Review weighs completion, quality, communication and evidence, then accounts for
+  unhandled requests, missing submission and reduced contribution ownership.
+- Score below 60 adds one warning. Score >=75 removes one warning.
+- Health-forced departure is recorded but adds no warning.
+- Repeated poor review requires at least three warnings and rolling performance
+  below 55 before dismissal is proposed.
+- Dismissal is not caused by one disagreement, refusal or relationship score.
+- The proposal becomes an appeal event after returning home; it is not an immediate
+  automatic deletion of employment. Pending appeal blocks departure and job switching.
+- Evidence appeal requires both evidence and communication >=40. It preserves
+  employment with two warnings, not a permanent guarantee.
+- A one-time improvement plan can defer termination; further poor work can reopen it.
+- Accepting termination preserves wages, savings, qualifications, home and appearance.
+- Job search remains available. A new employment starts a fresh performance record,
+  while narrative, relationship, prior-review and dismissal history remain saved.
+- Recognition, reprimand and dismissal have time-limited mood effects. Dismissal lasts
+  three game days and immediately lowers fun and raises stress.
+
+Persistence and delivery
+- Added career.workplace with legacy defaults; no online or offline auto-progress.
+- A legacy office save credits existing shift work to the new project and skips
+  interruption checkpoints that have already elapsed.
+- Project/event IDs prevent duplicate decisions after reload or double click.
+- Validation rejects malformed actors, references, task bounds and impossible casts.
+- Local implementation; no commit, push or deployment is implied by test results.

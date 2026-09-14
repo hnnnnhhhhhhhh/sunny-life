@@ -1,0 +1,43 @@
+[
+  {
+    "file": "sofa.glb",
+    "cache": "glam-sofa.glb",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/GlamVelvetSofa/glTF-Binary/GlamVelvetSofa.glb",
+    "author": "Eric Chadwick / Wayfair LLC",
+    "license": "CC-BY-4.0",
+    "sha256": "67202c74a1a33377771f162dc7fad612a6c9bd51ee15124c488e9851d9ac5266"
+  },
+  {
+    "file": "curtains.glb",
+    "cache": "quaternius-curtains.glb",
+    "url": "https://static.poly.pizza/cf707f1b-8d82-467d-b89e-e4c1322f4515.glb",
+    "page": "https://poly.pizza/m/kkeII96j9N",
+    "author": "Quaternius",
+    "license": "CC0-1.0",
+    "sha256": "3e1c17ee803414382470f1316825005ba4808f5c665602f8223880b1578f76b9"
+  },
+  {
+    "file": "sedan.glb",
+    "url": "https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip",
+    "entry": "Models/GLB format/sedan.glb",
+    "author": "Kenney",
+    "license": "CC0-1.0",
+    "sha256": "b532ea7d2c59f7f6b22b138cf1955218a2c1898f1cea932af4d3fd563c3959b7"
+  },
+  {
+    "file": "taxi.glb",
+    "url": "https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip",
+    "entry": "Models/GLB format/taxi.glb",
+    "author": "Kenney",
+    "license": "CC0-1.0",
+    "sha256": "3803539718ffd3b84b515dbce8ed6b489f1ff5be58edb1903d2c5db5c584bdc7"
+  },
+  {
+    "file": "van.glb",
+    "url": "https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip",
+    "entry": "Models/GLB format/van.glb",
+    "author": "Kenney",
+    "license": "CC0-1.0",
+    "sha256": "ed4ed56e8e5ed98db050af09ed2062b3b6bb7b93eab1e563cb6774b387b233a1"
+  }
+]

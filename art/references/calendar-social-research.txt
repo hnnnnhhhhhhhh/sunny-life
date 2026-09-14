@@ -1,0 +1,70 @@
+Research question
+How can daily obligations and residual stress change a social encounter without
+reducing friendship, attraction, and current mood to one interchangeable bar?
+
+Sources
+1. EA Help: sexuality, romance and attraction guide.
+   https://help.ea.com/en/articles/the-sims/the-sims-4/gender-romance-attraction-guide/
+   Primary source: distinct romantic satisfaction, boundaries and relationship dynamics.
+2. EA Help: Cupid's Corner and Create a Date.
+   https://help.ea.com/en/articles/the-sims/the-sims-4/cupids-corner-guide/
+   Primary source: target-specific social actions, invitations, calendar and date goals.
+3. EA Forums: official Lovestruck screenshot thread.
+   https://forums.ea.com/discussions/the-sims-4-creative-corner-en/the-sims-4-lovestruck---official-screenshot-thread/4938848
+   Primary player screenshots: public space, benches, group activities and neighborhood detail.
+4. Carl's Sims 4 Guide: Relationships.
+   https://www.carls-sims-4-guide.com/relationships/
+   Supplemental guide: separate friendship/romance meters and context-sensitive interactions.
+5. Carl's Sims 4 Guide: Emotions.
+   https://www.carls-sims-4-guide.com/emotions/
+   Supplemental guide: competing mood sources with timed effects.
+
+Signals examined
+- Which person the action targets, and where their relationship is shown.
+- Which interaction depends on relationship, current mood or mutual willingness.
+- Whether group presence alone grants relationship progress.
+- How negative and positive experiences coexist and expire.
+- Whether dates can be ended, rescheduled, or repaired.
+
+Assumption tested
+Being with a romantic partner does not necessarily make the current encounter happy.
+
+Finding that changes the design
+Relationship satisfaction and current emotions can disagree; maintaining independent
+state allows work frustration or a blackout to overshadow, not delete, affection.
+
+Reference evidence
+- EA's official article was read using the browser and web-fetch tools.
+- The browser screenshot export failed, and direct page capture hit a network error.
+- The two original in-game screenshots embedded in the official article were retrieved
+  and visually inspected instead; these are NOT screenshots of our own game:
+  .runtime/sims4-date-reference.png
+  .runtime/sims4-social-profile-reference.png
+- A third group-conversation screenshot from Carl's Relationships article was
+  retrieved through its web-search image link and inspected:
+  .runtime/sims4-group-interaction-reference.png
+- It shows seated participants, a compact conversation context and emotion sources
+  near the resident portrait. We keep contextual, per-person actions and source labels.
+- The profile shows portrait, traits and individual preferences; the date image has a
+  person-specific invitation action. Use structure, not EA artwork, colors or assets.
+- Carl's browser page requested security verification. No bypass was attempted.
+- Research images remain local and are not bundled into the game.
+
+Implementation decisions
+- 28 game days per billing cycle; day 1 is Monday; weekday work and weekend rest.
+- Rent is four times the salary at first lease/employment, fixed until housing changes.
+  Default unemployed reference rent: 1,800, based on a 450 daily salary.
+- Power 120, water 80, phone 40 and internet 60 per cycle before housing-size modifiers.
+- Grace periods precede service cutoff; payment restores the actual affected controls.
+- No forced eviction or deletion of a player's house for overdue rent.
+- Invitation/party, physical arrival, target-specific interaction and departure are
+  separate states. Parties cost 60; going out together costs 80.
+- Friendship, romance, trust, resentment and satisfaction are independent.
+- All romance candidates are adults. Relationship commitment requires mutual readiness.
+- Mood sources carry strength and duration. Work stress, unmet needs and utility
+  disconnection contribute to irritability and can provoke an optional conflict.
+- Calm explanations, space and apologies provide different repair paths.
+- A manual real-life reflection can add a mood source once per game day.
+  No device state, private messages, health data or real-life events are read automatically.
+- This is fictional gameplay tuning, not a model of mental health or a prediction of
+  real people's feelings.

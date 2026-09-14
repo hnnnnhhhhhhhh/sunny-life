@@ -42,7 +42,7 @@ test('apartment interior, entire building and mobile render without blank canvas
 });
 
 for(const [id,label,type] of [
-  ['tv-1','看一会儿电影','watch'],['bed-1','睡个好觉','sleep'],
+  ['tv-1','自然纪录片','watch'],['bed-1','睡个好觉','sleep'],
   ['shower-1','洗澡','shower'],['toilet-1','上厕所','toilet'],['sink-1','洗手','washHands'],
 ])test(`apartment ${type} remains reachable and cleans up after cancellation`,async({page})=>{
   await boot(page);
