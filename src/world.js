@@ -21,6 +21,7 @@ import {awayShopping,shoppingError,motionRate,ageEffects} from './life.js';
 import {createDryingRack} from './household-props.js';
 import {HomeGuests} from './home-guests.js';
 import {utilities} from './finance.js';
+import {QualityMaterials} from './render-quality.js';
 import {loadOfficeAssets,officeAssetStatus} from './office-assets.js';
 import {createOffice} from './office.js';
 import {moodState} from './needs.js';
@@ -47,7 +48,8 @@ export class World {
     this.scene.background = new THREE.Color('#c4d7d3');
     this.scene.fog = new THREE.Fog('#c4d7d3', 65, 190);
     const lowQuality=new URLSearchParams(window.location.search).get('quality')==='low' || navigator.hardwareConcurrency<=4;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: !lowQuality, alpha: false, preserveDrawingBuffer: true });
+    this.qualityMaterials = new QualityMaterials();
     this.renderer.setPixelRatio(lowQuality?0.5:Math.min(window.devicePixelRatio, 1.75));
     this.renderer.shadowMap.enabled = !lowQuality;
     this.renderer.shadowMap.type = THREE.VSMShadowMap;
@@ -56,7 +58,7 @@ export class World {
     this.renderer.toneMappingExposure = 1.08;
     const pmrem=new THREE.PMREMGenerator(this.renderer),room=new RoomEnvironment();
     this.environmentMap=pmrem.fromScene(room,.06);
-    this.scene.environment=this.environmentMap.texture;
+    this.scene.environment=lowQuality?null:this.environmentMap.texture;
     this.scene.environmentIntensity=.22;
     room.dispose();pmrem.dispose();
     this.renderer.domElement.setAttribute('aria-label', '晴屿三维世界');
@@ -748,7 +750,7 @@ export class World {
   animate(time) {
     if (this.disposed) return;
     this.frame = requestAnimationFrame(t => this.animate(t));
-    const dt = Math.min((time - this.lastTime) / 1000, 0.25);
+    const dt = document.hidden ? 0 : Math.min((time - this.lastTime) / 1000, 1);
     this.lastTime = time;
     if(!isApartment(this.state?.game.home))this.environmentSystem.update(time);
     if (this.cameraTransition) {
@@ -865,6 +867,8 @@ export class World {
       const cut = !this.state.roof && !exterior && this.state.cutaway !== false && inFront;
       full.visible = !cut; low.visible = cut;
     }
+    this.qualityMaterials.update(this.scene,!!this.state?.lowQuality);
+    this.scene.environment=this.state?.lowQuality?null:this.environmentMap.texture;
     if((isApartment(this.state?.game.home)||atWork(this.state?.game||{}))&&this.state.mode!=='avatar'&&!this.state.lowQuality)this.interiorRenderer.render(this.camera);
     else this.renderer.render(this.scene, this.camera);
   }
@@ -963,6 +967,7 @@ export class World {
 
   dispose() {
     this.disposed = true;
+    this.qualityMaterials?.dispose(this.scene);
     cancelAnimationFrame(this.frame);
     this.resizeObserver.disconnect();
     this.controls.dispose();
